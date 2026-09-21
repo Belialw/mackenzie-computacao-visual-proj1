@@ -1,0 +1,67 @@
+# ------------------------------------------------------------------------------
+# Projeto 1 - Computacao Visual (UPM FCI CC)
+#
+# Baseado no .gitignore do repositorio da disciplina
+# (profkishimoto/CompVis262), com adicoes especificas deste projeto.
+#
+# Importante: o criterio de avaliacao penaliza em -1,0 ponto o envio de
+# "arquivos e/ou pastas intermediarias que sao criadas no processo de
+# compilacao". Nada gerado pela build pode ser versionado.
+# ------------------------------------------------------------------------------
+
+# Saida da build deste projeto (objetos, executavel e DLLs copiadas).
+build/
+
+# Imagem gerada pelo programa ao pressionar a tecla S.
+output_image.png
+
+# Enunciado e relatorios em PDF: a entrega e feita pelo Moodle.
+/Projeto 1 (Proj1).pdf
+/Proj1_Etapa1.pdf
+
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# debug information files
+*.dwo

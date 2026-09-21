@@ -1,0 +1,17 @@
+# Normaliza os finais de linha: o repositorio armazena sempre LF e o checkout
+# usa LF em qualquer sistema operacional.
+#
+# Sem isso, o resultado depende da configuracao core.autocrlf de cada maquina.
+# Um Makefile ou um .c com CRLF em um checkout Linux/WSL pode quebrar a build,
+# e "projeto nao compila" zera a atividade.
+* text=auto eol=lf
+
+# Arquivos binarios nao devem sofrer conversao de fim de linha.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.bmp binary
+*.gif binary
+*.ttf binary
+*.otf binary
+*.pdf binary
