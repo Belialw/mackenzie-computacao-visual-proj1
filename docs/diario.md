@@ -65,3 +65,49 @@ terminal usado. Verificado funcionando a partir dos dois terminais.
 imagem *excede* a resolução da tela — com essa largura, o caminho só é
 exercitado por imagens muito grandes. É preciso separar uma imagem de teste
 acima de 3440 pixels de largura para validar esse requisito.
+
+---
+
+## 2026-09-21 — Makefile multiplataforma
+
+O `makefile` dos exemplos da disciplina não serve para a entrega como está: o
+`SDL_DIR` é um caminho absoluto fixo e as regras `clean` e de cópia das DLLs
+usam `del` e `copy`, que só existem no interpretador do Windows. Como o
+professor compila o projeto tanto no Windows quanto no WSL Ubuntu, um Makefile
+que só funciona em um dos dois é risco de "projeto não compila", que zera a
+atividade.
+
+Foi escrito um Makefile único que detecta a plataforma: no Windows usa
+`SDL_DIR` (sobrescrevível na linha de comando) e copia as DLLs para `build/`;
+no Linux usa `pkg-config` e acrescenta `-lm`.
+
+**Problema encontrado: o `make` não usa sempre o mesmo shell no Windows.**
+Medindo o valor de `$(SHELL)`, o `mingw32-make` reportou
+`C:/Program Files/Git/usr/bin/sh.exe` quando chamado pelo Git Bash e `sh.exe`
+(caindo para o `cmd.exe`) quando chamado pelo PowerShell. Ou seja, o mesmo
+Makefile executaria `mkdir -p build` em um terminal e precisaria de
+`if not exist build mkdir build` no outro. Solução: forçar `SHELL := cmd.exe`
+e `.SHELLFLAGS := /C` no ramo Windows. A definição precisa aparecer antes de
+qualquer `$(shell ...)` do arquivo, senão a expansão acontece com o shell
+errado.
+
+**Problema encontrado: `-std=c23` não existe antes do gcc 14.** O repositório
+da disciplina compila com `-std=c23` e o professor usa gcc 15.x, mas o gcc
+13.3 do WSL desta máquina recusa a opção com
+`unrecognized command-line option '-std=c23'; did you mean '-std=c2x'?`. O
+Makefile passou a consultar `gcc -dumpversion` e a escolher entre `c23` e
+`c2x` conforme a versão principal do compilador.
+
+**Validação.** Com um projeto de teste de três arquivos (`main.c`, `util.c`,
+`util.h`) que inclui e chama as três bibliotecas:
+
+| Ambiente | Resultado |
+| --- | --- |
+| Git Bash + gcc 15.2.0 | compila com `-std=c23`, gera `build/imgproc.exe`, executa |
+| PowerShell + gcc 15.2.0 | saída idêntica à do Git Bash |
+| WSL Ubuntu + gcc 13.3.0 | seleciona `-std=c2x`, alvo sem `.exe`, acrescenta `-lm` |
+
+Também foram verificados: recompilação incremental correta ao alterar um
+cabeçalho (via `-MMD -MP`), `make clean`, `make DEBUG=1` alternando os flags e
+definindo a macro `DEBUG`, e o override `SDL_DIR=` refletindo tanto nos `-I/-L`
+quanto no caminho de cópia das DLLs.
