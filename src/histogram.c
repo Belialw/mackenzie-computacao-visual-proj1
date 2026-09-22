@@ -13,6 +13,22 @@
 static const SDL_Color AXIS_LABEL_COLOR = { 150, 150, 160, 255 };
 
 //------------------------------------------------------------------------------
+// Limiares de classificação. O enunciado não define valores, então estes foram
+// escolhidos pelo grupo e a justificativa está no README.md.
+//
+// Brilho: a faixa de intensidades 0-255 dividida em três partes iguais.
+//
+// Contraste: uma imagem que usa toda a faixa tonal de maneira uniforme tem
+// desvio padrão de raiz((256^2 - 1) / 12), cerca de 73,9. O limiar de contraste
+// alto fica logo abaixo desse valor de referência, e o de contraste baixo no
+// ponto em que a imagem se concentra em uma faixa estreita e parece lavada.
+//------------------------------------------------------------------------------
+static const float DARK_MAX_MEAN = 85.0f;
+static const float LIGHT_MIN_MEAN = 170.0f;
+static const float LOW_MAX_STDDEV = 40.0f;
+static const float HIGH_MIN_STDDEV = 70.0f;
+
+//------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
 bool Histogram_compute(Histogram *histogram, SDL_Surface *surface)
@@ -36,6 +52,8 @@ bool Histogram_compute(Histogram *histogram, SDL_Surface *surface)
   SDL_zeroa(histogram->counts);
   histogram->max_count = 0;
   histogram->total_pixels = 0;
+  histogram->mean = 0.0f;
+  histogram->stddev = 0.0f;
 
   const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
 
@@ -70,8 +88,32 @@ bool Histogram_compute(Histogram *histogram, SDL_Surface *surface)
       histogram->max_count = histogram->counts[level];
   }
 
+  if (histogram->total_pixels > 0)
+  {
+    // Média das intensidades, ponderada pela quantidade de pixels de cada
+    // nível. A acumulação é feita em double: uma imagem grande soma valores
+    // altos o bastante para que float perca precisão ao final.
+    double weighted_sum = 0.0;
+    for (int level = 0; level < HISTOGRAM_LEVELS; ++level)
+      weighted_sum += (double)level * histogram->counts[level];
+
+    const double mean = weighted_sum / histogram->total_pixels;
+
+    // Desvio padrão das intensidades em relação à média.
+    double variance_sum = 0.0;
+    for (int level = 0; level < HISTOGRAM_LEVELS; ++level)
+    {
+      const double difference = (double)level - mean;
+      variance_sum += histogram->counts[level] * difference * difference;
+    }
+
+    histogram->mean = (float)mean;
+    histogram->stddev = (float)SDL_sqrt(variance_sum / histogram->total_pixels);
+  }
+
   LOG_DEBUG("\t%d pixels distribuídos em %d níveis; nível mais frequente tem %d pixels",
     histogram->total_pixels, HISTOGRAM_LEVELS, histogram->max_count);
+  LOG_DEBUG("	média = %.2f, desvio padrão = %.2f", histogram->mean, histogram->stddev);
 
   LOG_DEBUG("<<< Histogram_compute()");
   return true;
@@ -127,4 +169,38 @@ void Histogram_draw(const Histogram *histogram, SDL_Renderer *renderer, const SD
     Text_draw(text, renderer, area->x + 128.0f - 11.0f, label_y, AXIS_LABEL_COLOR, "128");
     Text_draw(text, renderer, area->x + 255.0f - 22.0f, label_y, AXIS_LABEL_COLOR, "255");
   }
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+const char *Histogram_brightness_label(const Histogram *histogram)
+{
+  if (!histogram || histogram->total_pixels <= 0)
+    return "indisponível";
+
+  if (histogram->mean < DARK_MAX_MEAN)
+    return "escura";
+
+  if (histogram->mean >= LIGHT_MIN_MEAN)
+    return "clara";
+
+  return "média";
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+const char *Histogram_contrast_label(const Histogram *histogram)
+{
+  if (!histogram || histogram->total_pixels <= 0)
+    return "indisponível";
+
+  if (histogram->stddev < LOW_MAX_STDDEV)
+    return "baixo";
+
+  if (histogram->stddev >= HIGH_MIN_STDDEV)
+    return "alto";
+
+  return "médio";
 }

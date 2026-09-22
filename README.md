@@ -154,8 +154,53 @@ Dois detalhes que o Makefile resolve automaticamente:
 
 ## Decisões de implementação
 
-_A ser preenchido: limiares de classificação de brilho e contraste, fonte
-escolhida, formato da imagem salva._
+### Limiares de classificação do histograma
+
+O enunciado pede que a imagem seja classificada como "clara", "média" ou
+"escura" a partir da média de intensidade, e que o contraste seja classificado
+como "alto", "médio" ou "baixo" a partir do desvio padrão, mas não define os
+valores de corte. Os adotados pelo grupo são:
+
+| Classificação | Critério |
+| --- | --- |
+| Imagem escura | média < 85 |
+| Imagem média | 85 ≤ média < 170 |
+| Imagem clara | média ≥ 170 |
+| Contraste baixo | desvio padrão < 40 |
+| Contraste médio | 40 ≤ desvio padrão < 70 |
+| Contraste alto | desvio padrão ≥ 70 |
+
+**Brilho.** A faixa de intensidades vai de 0 a 255 e foi dividida em três
+partes iguais, o que coloca os cortes em 85 e 170.
+
+**Contraste.** O desvio padrão não tem uma divisão igualmente óbvia, então os
+cortes foram ancorados em dois valores de referência:
+
+- O **máximo possível** é 127,5, obtido por uma imagem com metade dos pixels em
+  0 e metade em 255. É um caso degenerado, que não ocorre em imagens reais.
+- Uma imagem que usa **toda a faixa tonal de maneira uniforme** tem desvio
+  padrão de `raiz((256² − 1) / 12)`, aproximadamente **73,9**.
+
+O corte de contraste alto ficou em 70, logo abaixo dessa segunda referência:
+uma imagem que percorre toda a faixa tonal é classificada como de contraste
+alto. O corte de contraste baixo ficou em 40, abaixo do qual a distribuição se
+concentra em uma faixa estreita e a imagem aparenta estar "lavada".
+
+Os valores numéricos da média e do desvio padrão são exibidos na janela
+secundária junto das classificações, de modo que a análise possa ser conferida,
+e não apenas lida.
+
+### Fonte dos textos
+
+**DejaVu Sans 2.37**, distribuída com o projeto em `assets/fonts/`. Ver
+[assets/fonts/README.md](assets/fonts/README.md) para os critérios da escolha.
+
+### Exibição da imagem
+
+A imagem é desenhada na maior escala que couber na janela sem distorcer as
+proporções, centralizada, com o espaço restante como margem. A alternativa
+seria esticá-la até as dimensões exatas da janela, o que deformaria qualquer
+imagem cuja proporção fosse diferente da proporção da janela.
 
 ---
 

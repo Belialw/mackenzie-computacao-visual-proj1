@@ -646,3 +646,58 @@ As duas imagens de teste produzem exatamente o gráfico previsto:
 - `kodim23.png` desenha uma distribuição real, concentrada em torno do nível
   90 e com um segundo agrupamento perto do 190, condizente com uma fotografia
   de tons predominantemente médios.
+
+---
+
+## 2026-09-22 — Item 4 (parte 3): média, desvio padrão e classificações
+
+Fecha o item de maior peso do escopo. A struct do histograma ganhou a média das
+intensidades e o desvio padrão em relação a ela, calculados na mesma passagem
+em que o histograma é montado.
+
+A acumulação usa `double` em vez de `float`. A soma ponderada de uma imagem de
+alguns megapixels chega à casa dos bilhões, faixa em que `float` já perdeu
+precisão suficiente para deslocar o resultado.
+
+**Os limiares de classificação.** O enunciado pede as classificações mas não
+define os valores de corte, então eles foram escolhidos pelo grupo e estão
+justificados no README. Para o brilho, a faixa 0–255 dividida em três partes
+iguais, com cortes em 85 e 170. Para o contraste não existe divisão igualmente
+óbvia, então os cortes foram ancorados em dois valores de referência: o máximo
+possível, 127,5, obtido por uma imagem com metade dos pixels em 0 e metade em
+255, e o desvio de uma imagem que usa toda a faixa tonal uniformemente,
+`raiz((256² − 1) / 12)`, cerca de 73,9. O corte de contraste alto ficou em 70,
+logo abaixo dessa segunda referência, e o de contraste baixo em 40.
+
+Os valores numéricos aparecem na janela secundária junto das classificações. A
+ideia é que quem avalia possa conferir a conta, em vez de ter que confiar no
+rótulo.
+
+### Verificação
+
+A média e o desvio padrão têm valores previsíveis analiticamente para as
+imagens de teste, e os dois conferiram exatamente:
+
+| Imagem | Média esperada | Obtida | Desvio esperado | Obtido |
+| --- | --- | --- | --- | --- |
+| `gray_gradient.png` (uniforme 0–255) | 127,50 | 127,50 | 73,90 | 73,90 |
+| `kodim23.png` | — | 109,71 | — | 47,45 |
+
+O desvio esperado do gradiente vem da fórmula do desvio padrão de uma
+distribuição uniforme discreta sobre 0–255.
+
+As classificações foram verificadas com histogramas sintéticos, já que as duas
+imagens de teste só exercitam "média" e os contrastes "médio" e "alto":
+
+| Histograma | Média | Desvio | Brilho | Contraste |
+| --- | --- | --- | --- | --- |
+| sólido no nível 40 | 40,00 | 0,00 | escura | baixo |
+| sólido no nível 128 | 128,00 | 0,00 | média | baixo |
+| sólido no nível 200 | 200,00 | 0,00 | clara | baixo |
+| metade em 0, metade em 255 | 127,50 | 127,50 | média | alto |
+| sólido no nível 84 | 84,00 | 0,00 | escura | baixo |
+
+O quarto caso confirma o máximo teórico de 127,5 para o desvio padrão, e o
+quinto confirma o comportamento junto ao limiar de 85.
+
+Com isso o item 4 se encerra, e com ele os 2,50 pontos de maior peso do escopo.

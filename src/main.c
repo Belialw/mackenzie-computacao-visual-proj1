@@ -61,6 +61,9 @@ static const SDL_FRect HISTOGRAM_AREA = { 82.0f, 24.0f, 256.0f, 200.0f };
 
 // Tamanho em pontos e cores da fonte usada nos textos da janela secundária.
 static const float FONT_SIZE = 15.0f;
+
+// Margem esquerda do bloco de informações da análise, na janela secundária.
+static const float INFO_X = 24.0f;
 static const SDL_Color TEXT_COLOR = { 232, 232, 238, 255 };
 static const SDL_Color TEXT_MUTED_COLOR = { 150, 150, 160, 255 };
 
@@ -311,10 +314,23 @@ void render_secondary(const App *app)
   Text_draw(&app->text, renderer, HISTOGRAM_AREA.x, 2.0f, TEXT_COLOR, "Histograma");
   Histogram_draw(&app->histogram, renderer, &HISTOGRAM_AREA, &app->text);
 
-  // As informações de análise (item 4) e os dois botões (itens 5 e 6) entram
-  // abaixo do gráfico.
-  Text_draw(&app->text, renderer, 32.0f, 258.0f, TEXT_COLOR, "Informações da imagem");
-  Text_draw(&app->text, renderer, 32.0f, 286.0f, TEXT_MUTED_COLOR, "Brilho e contraste: item 4.");
+  Text_draw(&app->text, renderer, INFO_X, 258.0f, TEXT_COLOR, "Informações da imagem");
+
+  // O valor numérico é exibido junto da classificação para que a análise possa
+  // ser conferida, e não apenas lida.
+  char line[128] = { 0 };
+
+  SDL_snprintf(line, sizeof(line), "Média de intensidade: %.2f", app->histogram.mean);
+  Text_draw(&app->text, renderer, INFO_X, 286.0f, TEXT_MUTED_COLOR, line);
+
+  SDL_snprintf(line, sizeof(line), "Imagem %s", Histogram_brightness_label(&app->histogram));
+  Text_draw(&app->text, renderer, INFO_X, 306.0f, TEXT_COLOR, line);
+
+  SDL_snprintf(line, sizeof(line), "Desvio padrão: %.2f", app->histogram.stddev);
+  Text_draw(&app->text, renderer, INFO_X, 336.0f, TEXT_MUTED_COLOR, line);
+
+  SDL_snprintf(line, sizeof(line), "Contraste %s", Histogram_contrast_label(&app->histogram));
+  Text_draw(&app->text, renderer, INFO_X, 356.0f, TEXT_COLOR, line);
 
   SDL_RenderPresent(renderer);
 }

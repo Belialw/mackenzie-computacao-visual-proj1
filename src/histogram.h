@@ -35,6 +35,11 @@ struct Histogram
   int counts[HISTOGRAM_LEVELS];
   int max_count;
   int total_pixels;
+
+  // Média das intensidades e desvio padrão em relação a ela, ambos em níveis
+  // de intensidade (0 a 255).
+  float mean;
+  float stddev;
 };
 
 /**
@@ -59,5 +64,18 @@ bool Histogram_compute(Histogram *histogram, SDL_Surface *surface);
  * `text` pode ser nulo, caso em que os rótulos do eixo não são desenhados.
  */
 void Histogram_draw(const Histogram *histogram, SDL_Renderer *renderer, const SDL_FRect *area, const TextRenderer *text);
+
+
+/**
+ * Classificação da imagem a partir da média de intensidade: "escura", "média"
+ * ou "clara". Os limiares adotados e a justificativa estão no README.md.
+ */
+const char *Histogram_brightness_label(const Histogram *histogram);
+
+/**
+ * Classificação do contraste a partir do desvio padrão: "baixo", "médio" ou
+ * "alto". Os limiares adotados e a justificativa estão no README.md.
+ */
+const char *Histogram_contrast_label(const Histogram *histogram);
 
 #endif // HISTOGRAM_H
