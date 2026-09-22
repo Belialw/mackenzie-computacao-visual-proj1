@@ -572,3 +572,39 @@ Uma captura de tela da janela secundária confirmou os textos desenhados, com os
 acentos renderizando corretamente em "Informações da imagem".
 
 Com isso a Fase 3 se encerra: janela principal, janela secundária e textos.
+
+---
+
+## 2026-09-22 — Item 4 (parte 1): cálculo do histograma
+
+Começo do item de maior peso do escopo. Novo módulo `histogram`, com uma struct
+que guarda a contagem de pixels por nível de intensidade, a maior dessas
+contagens e o total.
+
+A `max_count` existe para o desenho: o gráfico precisa ser proporcional à
+altura disponível, e a referência para essa proporção é o nível mais
+frequente. Calcular na hora de desenhar significaria varrer os 256 níveis a
+cada quadro, então o valor é obtido junto com a contagem.
+
+Como a imagem já está em escala de cinza quando o histograma é calculado, os
+três canais de cor têm o mesmo valor e a intensidade de cada pixel é lida de um
+deles. A varredura usa `surface->pitch`, pelo mesmo motivo das funções de
+escala de cinza.
+
+### Verificação
+
+Foram usadas três imagens sintéticas de contagem previsível:
+
+| Imagem | Esperado | Obtido |
+| --- | --- | --- |
+| gradiente 256x128, intensidade = coluna | 128 pixels em cada um dos 256 níveis, total 32768 | exato, nenhum bin divergente |
+| sólida de intensidade 128, 100x50 | 5000 pixels no nível 128 e zero nos demais | exato, nenhum bin divergente |
+| gradiente 257x3 (largura ímpar) | total 771 | exato |
+
+O terceiro caso existe para exercitar o cálculo do endereço de cada linha: uma
+largura que não é múltiplo de valores "redondos" é a situação em que a SDL pode
+inserir bytes de preenchimento no fim das linhas, e em que a varredura por
+`w * 4` leria o pixel errado.
+
+Nas imagens reais do projeto os totais também conferem: 32768 pixels para
+`gray_gradient.png` (256x128) e 393216 para `kodim23.png` (768x512).

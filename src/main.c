@@ -30,6 +30,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include "histogram.h"
 #include "image.h"
 #include "text.h"
 #include "log.h"
@@ -75,6 +76,7 @@ struct App
   MyWindow secondary_window;
   MyImage image;
   TextRenderer text;
+  Histogram histogram;
 };
 
 //------------------------------------------------------------------------------
@@ -458,6 +460,7 @@ int main(int argc, char *argv[])
     .main_window      = { .window = NULL, .renderer = NULL },
     .secondary_window = { .window = NULL, .renderer = NULL },
     .text = { .font = NULL, .initialized = false },
+    .histogram = { .counts = { 0 }, .max_count = 0, .total_pixels = 0 },
     .image = {
       .surface = NULL,
       .texture = NULL,
@@ -493,6 +496,14 @@ int main(int argc, char *argv[])
       shutdown(&app);
       return EXIT_FAILURE;
     }
+  }
+
+  // O histograma é calculado sobre a imagem em escala de cinza, que é a base
+  // das operações seguintes.
+  if (!Histogram_compute(&app.histogram, app.image.surface))
+  {
+    shutdown(&app);
+    return EXIT_FAILURE;
   }
 
   loop(&app);
