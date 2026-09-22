@@ -521,3 +521,54 @@ resolução inacessíveis.
 em (3, 26). Uma captura de tela do canto superior esquerdo confirmou a janela
 secundária inteira, com barra de título, botões de minimizar, maximizar e
 fechar, e a área reservada ao gráfico do histograma delimitada.
+
+---
+
+## 2026-09-22 — Item 8: carregamento da fonte
+
+O item 8 do escopo pede que "o código garanta que a fonte usada pelos textos do
+programa é carregada e usada corretamente, independentemente do sistema
+operacional em que o programa for executado". São duas exigências embutidas
+nisso, e as duas têm a mesma solução.
+
+**A fonte não pode vir do sistema operacional.** Um caminho como
+`C:\Windows\Fonts\arial.ttf` simplesmente não existe no Linux, e o nome e a
+localização das fontes variam entre distribuições. A fonte escolhida é
+distribuída junto com o código, em `assets/fonts/`.
+
+**O caminho não pode ser relativo ao diretório de trabalho.** Um
+`"assets/fonts/DejaVuSans.ttf"` puro só funciona se o programa for chamado da
+raiz do projeto. O caminho é montado com `SDL_GetBasePath()`, que devolve o
+diretório do próprio executável, e o `Makefile` ganhou um alvo `assets` que
+copia a pasta para junto do binário, da mesma forma que já copiava as DLLs.
+
+**Fonte escolhida: DejaVu Sans 2.37.** Os critérios foram licença permissiva
+que autoriza a redistribuição junto com o projeto (o arquivo de licença está em
+`assets/fonts/LICENSE-DejaVu.txt`), cobertura dos caracteres acentuados do
+português, já que as mensagens do programa usam acentuação, e legibilidade em
+tamanhos pequenos, necessária para as informações de análise da janela
+secundária. O arquivo tem 740 KB.
+
+**Estado da fonte dentro do `App`.** O módulo `text` poderia guardar a fonte em
+uma variável estática, que é o caminho mais curto. Preferiu-se uma struct
+`TextRenderer` guardada no `App` e recebida por parâmetro, pelo mesmo motivo
+que levou à remoção das variáveis globais do código original — não faria
+sentido eliminá-las e reintroduzir uma logo em seguida.
+
+**Detalhes da API.** No SDL3_ttf, `TTF_RenderText_Blended()` recebe o
+comprimento da string como parâmetro, e o valor 0 indica que a string termina
+em `\0`. O `TTF_Quit()` só é chamado se o `TTF_Init()` tiver sido bem-sucedido,
+para não desequilibrar a contagem interna da biblioteca quando a inicialização
+falha antes disso.
+
+**Verificação.** Executando o programa a partir da raiz do projeto e a partir
+de `C:\`, o caminho resolvido foi idêntico nos dois casos:
+
+```
+Carregando a fonte C:\...\build\assets/fonts/DejaVuSans.ttf...
+```
+
+Uma captura de tela da janela secundária confirmou os textos desenhados, com os
+acentos renderizando corretamente em "Informações da imagem".
+
+Com isso a Fase 3 se encerra: janela principal, janela secundária e textos.

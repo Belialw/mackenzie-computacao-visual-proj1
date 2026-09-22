@@ -31,6 +31,7 @@
 #include <SDL3/SDL_main.h>
 
 #include "image.h"
+#include "text.h"
 #include "log.h"
 #include "window.h"
 
@@ -57,6 +58,11 @@ enum constants
 // pixels de largura, um por nível de intensidade, centralizada na janela.
 static const SDL_FRect HISTOGRAM_AREA = { 82.0f, 24.0f, 256.0f, 200.0f };
 
+// Tamanho em pontos e cores da fonte usada nos textos da janela secundária.
+static const float FONT_SIZE = 15.0f;
+static const SDL_Color TEXT_COLOR = { 232, 232, 238, 255 };
+static const SDL_Color TEXT_MUTED_COLOR = { 150, 150, 160, 255 };
+
 /**
  * Estado da aplicação. Substitui as variáveis globais do código original: em
  * vez de cada função acessar diretamente a janela e a imagem, ambas são
@@ -68,6 +74,7 @@ struct App
   MyWindow main_window;
   MyWindow secondary_window;
   MyImage image;
+  TextRenderer text;
 };
 
 //------------------------------------------------------------------------------
@@ -187,6 +194,15 @@ SDL_AppResult initialize(App *app)
   SDL_ShowWindow(app->main_window.window);
   SDL_ShowWindow(app->secondary_window.window);
 
+  // A fonte é carregada depois das janelas porque os textos só são desenhados
+  // por meio de um renderizador.
+  LOG_DEBUG("\tCarregando a fonte dos textos...");
+  if (!Text_initialize(&app->text, FONT_SIZE))
+  {
+    LOG_DEBUG("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
+
   if (DEBUG_ENABLED)
   {
     int x = 0;
@@ -218,6 +234,7 @@ void shutdown(App *app)
 {
   LOG_DEBUG(">>> shutdown()");
 
+  Text_shutdown(&app->text);
   MyImage_destroy(&app->image);
 
   // A janela filha é destruída antes da janela pai.
@@ -289,11 +306,16 @@ void render_secondary(const App *app)
   SDL_SetRenderDrawColor(renderer, 24, 24, 28, 255);
   SDL_RenderClear(renderer);
 
-  // O gráfico do histograma (item 4), as informações de análise (item 4) e os
-  // dois botões (itens 5 e 6) entram nesta janela. Por enquanto só a área
-  // reservada ao gráfico é delimitada.
+  Text_draw(&app->text, renderer, HISTOGRAM_AREA.x, 2.0f, TEXT_COLOR, "Histograma");
+
+  // O gráfico do histograma e as informações de análise (item 4) e os dois
+  // botões (itens 5 e 6) entram nesta janela. Por enquanto só a área reservada
+  // ao gráfico é delimitada.
   SDL_SetRenderDrawColor(renderer, 70, 70, 80, 255);
   SDL_RenderRect(renderer, &HISTOGRAM_AREA);
+
+  Text_draw(&app->text, renderer, 32.0f, 244.0f, TEXT_COLOR, "Informações da imagem");
+  Text_draw(&app->text, renderer, 32.0f, 272.0f, TEXT_MUTED_COLOR, "Brilho e contraste: itens 4 e 5.");
 
   SDL_RenderPresent(renderer);
 }
@@ -435,6 +457,7 @@ int main(int argc, char *argv[])
   App app = {
     .main_window      = { .window = NULL, .renderer = NULL },
     .secondary_window = { .window = NULL, .renderer = NULL },
+    .text = { .font = NULL, .initialized = false },
     .image = {
       .surface = NULL,
       .texture = NULL,

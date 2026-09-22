@@ -127,14 +127,14 @@ endif
 # Imagem usada por "make run". Sobrescreva com: make run IMG=caminho/imagem.png
 IMG ?= samples/kodim23.png
 
-.PHONY: all dlls run clean
+.PHONY: all dlls assets run clean
 
 ifeq ($(SRCS),)
 all:
 	@echo Nenhum arquivo .c encontrado em $(SRC_DIR)/.
 	@exit 1
 else
-all: $(BIN) dlls
+all: $(BIN) dlls assets
 endif
 
 $(BIN): $(OBJS)
@@ -155,6 +155,20 @@ ifeq ($(OS),Windows_NT)
 	@copy /y "$(SDL_DIR_WIN)\bin\SDL3.dll" "$(BUILD_DIR_WIN)\SDL3.dll" >nul
 	@copy /y "$(SDL_DIR_WIN)\bin\SDL3_image.dll" "$(BUILD_DIR_WIN)\SDL3_image.dll" >nul
 	@copy /y "$(SDL_DIR_WIN)\bin\SDL3_ttf.dll" "$(BUILD_DIR_WIN)\SDL3_ttf.dll" >nul
+endif
+
+
+# ------------------------------------------------------------------------------
+# A fonte usada nos textos e qualquer outro recurso sao copiados para junto do
+# executavel. O programa monta o caminho da fonte a partir de SDL_GetBasePath(),
+# que devolve o diretorio do proprio executavel, e nao do diretorio de trabalho.
+# Assim o programa encontra a fonte de onde quer que seja chamado.
+# ------------------------------------------------------------------------------
+assets: | $(BUILD_DIR)
+ifeq ($(OS),Windows_NT)
+	@xcopy /e /i /y /q "assets" "$(BUILD_DIR_WIN)\assets" >nul
+else
+	@cp -r assets $(BUILD_DIR)/
 endif
 
 run: all
