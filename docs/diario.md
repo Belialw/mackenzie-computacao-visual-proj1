@@ -869,3 +869,56 @@ A terceira linha repete a primeira **exatamente**, o que confirma que a imagem
 em escala de cinza foi recuperada da memória sem perda: se houvesse
 recarregamento ou reconversão, qualquer diferença de arredondamento apareceria
 nos valores. O gráfico volta à forma original, e não a uma aproximação dela.
+
+---
+
+## 2026-09-22 — Item 6: alternância de resolução da janela principal
+
+O segundo botão alterna a janela principal entre a resolução original da imagem
+e 1024x768, e com isso a Fase 5 se encerra.
+
+O desenho não precisou mudar: `compute_image_destination()` já escala a imagem
+para a maior dimensão que couber na janela sem distorcer. Quando a janela passa
+a ter exatamente as dimensões da imagem, o fator de escala é 1 e a imagem
+aparece pixel a pixel.
+
+**A regra de posicionamento.** O enunciado pede a janela centralizada no
+monitor principal, exceto quando o tamanho dela excede a resolução da tela —
+nesse caso o canto superior esquerdo vai para o começo da tela. A comparação é
+com `SDL_GetDisplayUsableBounds()`, e não com a resolução bruta do monitor,
+porque a área ocupada pela barra de tarefas não está disponível para a janela.
+
+No caminho do canto, a posição usa o mesmo ajuste de borda da janela
+secundária: `SDL_SetWindowPosition()` posiciona a área de cliente, então pedir
+(0, 0) literal jogaria a barra de título para fora da tela e deixaria a janela
+sem como ser movida ou fechada.
+
+**Uma imagem de teste para o caminho que não acontece.** O monitor de
+desenvolvimento tem 3440x1392 de área útil, então quase nenhuma imagem comum
+dispara a condição de janela maior que a tela — o caminho seria implementado e
+nunca exercitado. Foi gerada `samples/large_gradient.png`, de 4000x2600, com um
+gradiente diagonal em faixas para que o histograma não ficasse degenerado.
+
+### Verificação
+
+| Imagem | Resolução original | Cabe na tela? | Posição obtida | Esperado |
+| --- | --- | --- | --- | --- |
+| `kodim23.png` | 768x512 | sim | (1336, 440) | centralizada: (3440−768)/2 e (1392−512)/2 |
+| `large_gradient.png` | 4000x2600 | não | (3, 26) | canto superior esquerdo, ajustado pela borda |
+
+Os dois valores de centralização batem exatamente com a conta. No caso da
+imagem grande, o log registra a decisão:
+
+```
+Janela maior que a área útil (3440x1392): posicionada no canto superior esquerdo.
+Janela principal reposicionada para (3, 26)
+```
+
+A alternância de volta para 1024x768 recentraliza a janela, e o rótulo do botão
+acompanha nos dois sentidos.
+
+**Observação.** Com a imagem grande, a janela principal e a secundária ficam
+ambas no canto superior esquerdo e se sobrepõem, com a secundária à frente por
+ser janela filha. Não é um defeito da implementação: é a consequência direta de
+duas exigências do enunciado que apontam para a mesma coordenada — a secundária
+sempre em (0,0) e a principal também em (0,0) quando não cabe na tela.

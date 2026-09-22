@@ -78,6 +78,7 @@ static const SDL_FRect RESOLUTION_BUTTON_AREA = { 24.0f, 456.0f, 372.0f, 44.0f }
 static const char *EQUALIZE_LABEL_APPLY      = "Equalizar histograma";
 static const char *EQUALIZE_LABEL_REVERT      = "Ver original";
 static const char *RESOLUTION_LABEL_ORIGINAL = "Resolução original";
+static const char *RESOLUTION_LABEL_FIT      = "1024x768";
 static const SDL_Color TEXT_COLOR = { 232, 232, 238, 255 };
 static const SDL_Color TEXT_MUTED_COLOR = { 150, 150, 160, 255 };
 
@@ -102,6 +103,10 @@ struct App
   // Indica se a janela principal exibe a imagem equalizada ou a original em
   // escala de cinza.
   bool equalized;
+
+  // Indica se a janela principal está na resolução original da imagem ou no
+  // tamanho padrão de 1024x768.
+  bool original_resolution;
 };
 
 //------------------------------------------------------------------------------
@@ -125,6 +130,12 @@ static bool check_image_path(const char *filename);
  * Alterna entre a imagem equalizada e a imagem em escala de cinza original,
  * atualizando o rótulo do botão, o histograma e as duas janelas.
  */
+/**
+ * Alterna a janela principal entre a resolução original da imagem e 1024x768,
+ * reposicionando-a conforme ela caiba ou não no monitor.
+ */
+static void toggle_resolution(App *app);
+
 static void toggle_equalization(App *app);
 
 static SDL_AppResult initialize(App *app);
@@ -145,6 +156,76 @@ static void loop(App *app);
 
 //------------------------------------------------------------------------------
 // 
+//------------------------------------------------------------------------------
+void toggle_resolution(App *app)
+{
+  LOG_DEBUG(">>> toggle_resolution()");
+
+  app->original_resolution = !app->original_resolution;
+
+  int width = MAIN_WINDOW_WIDTH;
+  int height = MAIN_WINDOW_HEIGHT;
+
+  if (app->original_resolution)
+  {
+    width = (int)app->image.rect.w;
+    height = (int)app->image.rect.h;
+    Button_set_label(&app->resolution_button, RESOLUTION_LABEL_FIT);
+  }
+  else
+  {
+    Button_set_label(&app->resolution_button, RESOLUTION_LABEL_ORIGINAL);
+  }
+
+  SDL_SetWindowSize(app->main_window.window, width, height);
+
+  // A janela fica centralizada no monitor principal, exceto quando não cabe
+  // nele. Nesse caso o canto superior esquerdo vai para o começo da tela, como
+  // o enunciado descreve: centralizar uma janela maior que o monitor deixaria
+  // a barra de título fora da área visível, sem como mover ou fechar a janela.
+  const SDL_DisplayID primary_display = SDL_GetPrimaryDisplay();
+  SDL_Rect bounds = { 0, 0, 0, 0 };
+  SDL_GetDisplayUsableBounds(primary_display, &bounds);
+
+  if (width > bounds.w || height > bounds.h)
+  {
+    // Mesmo ajuste de borda usado na janela secundária: SDL_SetWindowPosition
+    // posiciona a área de cliente, e pedir (0, 0) literal jogaria a decoração
+    // para fora da tela.
+    int border_top = 0;
+    int border_left = 0;
+    SDL_GetWindowBordersSize(app->main_window.window, &border_top, &border_left, NULL, NULL);
+    SDL_SetWindowPosition(app->main_window.window, border_left, border_top);
+
+    LOG_DEBUG("\tJanela maior que a área útil (%dx%d): posicionada no canto superior esquerdo.",
+      bounds.w, bounds.h);
+  }
+  else
+  {
+    const int centered = (int)SDL_WINDOWPOS_CENTERED_DISPLAY(primary_display);
+    SDL_SetWindowPosition(app->main_window.window, centered, centered);
+  }
+
+  SDL_SyncWindow(app->main_window.window);
+
+  if (DEBUG_ENABLED)
+  {
+    int x = 0;
+    int y = 0;
+    SDL_GetWindowPosition(app->main_window.window, &x, &y);
+    LOG_DEBUG("\tJanela principal reposicionada para (%d, %d)", x, y);
+  }
+
+  LOG_INFO("Janela principal: %dx%d (%s)", width, height,
+    app->original_resolution ? "resolução original da imagem" : "1024x768");
+
+  render(app);
+
+  LOG_DEBUG("<<< toggle_resolution()");
+}
+
+//------------------------------------------------------------------------------
+//
 //------------------------------------------------------------------------------
 void toggle_equalization(App *app)
 {
@@ -520,7 +601,7 @@ void loop(App *app)
             toggle_equalization(app);
 
           if (resolution_activated)
-            LOG_DEBUG("Botão de resolução acionado.");
+            toggle_resolution(app);
 
           if (a || b)
             render_secondary(app);
@@ -621,6 +702,7 @@ int main(int argc, char *argv[])
     .equalize_button   = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
     .resolution_button = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
     .equalized = false,
+    .original_resolution = false,
     .image = {
       .surface = NULL,
       .texture = NULL,
