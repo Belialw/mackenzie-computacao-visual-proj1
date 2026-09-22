@@ -111,3 +111,45 @@ Também foram verificados: recompilação incremental correta ao alterar um
 cabeçalho (via `-MMD -MP`), `make clean`, `make DEBUG=1` alternando os flags e
 definindo a macro `DEBUG`, e o override `SDL_DIR=` refletindo tanto nos `-I/-L`
 quanto no caminho de cópia das DLLs.
+
+---
+
+## 2026-09-21 — Importação do código-base da disciplina
+
+Entre os exemplos do repositório da disciplina, o escolhido como base foi o
+`src/05-filter_image`. É o que mais se aproxima do que o projeto pede: já
+carrega a imagem com `IMG_Load` e a converte para `SDL_PIXELFORMAT_RGBA32`,
+percorre os pixels com `SDL_LockSurface` / `SDL_GetRGB` / `SDL_MapRGB` (molde
+para a conversão em escala de cinza e para a equalização), atualiza a textura a
+partir de uma surface processada, restaura a imagem original sem recarregar o
+arquivo do disco, e redimensiona e reposiciona a janela usando
+`SDL_GetWindowBordersSize` — que é exatamente o que o item 6 do escopo exige.
+
+O arquivo foi copiado **sem nenhuma alteração** (conferido por hash), junto com
+a imagem de teste `kodim23.png`. A ideia é que todo o trabalho do grupo apareça
+como diferença em relação a este commit, o que torna o histórico do repositório
+a resposta direta para a pergunta do relatório sobre o que foi refatorado no
+código original.
+
+O código compilou pelo Makefile do projeto sem erros. Os dois únicos avisos são
+`unused parameter 'argc'` e `unused parameter 'argv'`, ou seja, o próprio
+compilador aponta a refatoração que o professor sugere no cabeçalho do arquivo:
+receber o caminho da imagem por parâmetro no lugar da constante
+`IMAGE_FILENAME`.
+
+Execução verificada: o programa carregou `kodim23.png`, redimensionou a janela
+de 640x480 para 768x512 e entrou no loop de eventos. Como o nome do arquivo
+ainda é uma constante relativa ao diretório atual, o programa só encontra a
+imagem se for executado de dentro de `samples/`. Isso deixa de valer no próximo
+commit.
+
+### Refatorações previstas
+
+O cabeçalho do arquivo original lista as refatorações que o próprio autor
+considera necessárias em um projeto real, e elas serão feitas em commits
+separados:
+
+1. separar o código em headers `.h` e arquivos `.c`;
+2. remover as variáveis globais;
+3. reduzir os logs, desativando-os na build de release;
+4. receber o arquivo de imagem por `argv` no lugar da constante.
