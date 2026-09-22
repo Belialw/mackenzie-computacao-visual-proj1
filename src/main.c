@@ -37,12 +37,12 @@
 //------------------------------------------------------------------------------
 // Custom types, structs, constants, etc.
 //------------------------------------------------------------------------------
-static const char *WINDOW_TITLE = "Filter image";
+static const char *WINDOW_TITLE = "Projeto 1 - Processamento de imagens";
 
 enum constants
 {
-  DEFAULT_WINDOW_WIDTH = 640,
-  DEFAULT_WINDOW_HEIGHT = 480,
+  DEFAULT_WINDOW_WIDTH = 1024,
+  DEFAULT_WINDOW_HEIGHT = 768,
 };
 
 /**
@@ -78,6 +78,12 @@ static void reset_image(App *app);
 
 static SDL_AppResult initialize(App *app);
 static void shutdown(App *app);
+/**
+ * Calcula onde a imagem deve ser desenhada dentro da janela principal: a maior
+ * escala que couber sem distorcer as proporções, centralizada.
+ */
+static bool compute_image_destination(const App *app, SDL_FRect *destination);
+
 static void render(const App *app);
 static void loop(App *app);
 
@@ -109,12 +115,38 @@ SDL_AppResult initialize(App *app)
     return SDL_APP_FAILURE;
   }
 
+  // A janela nasce oculta para poder ser posicionada antes de aparecer. Criada
+  // visível, ela surgiria na posição padrão do sistema e só então saltaria
+  // para o centro do monitor.
   LOG_DEBUG("\tCriando janela e renderizador...");
-  if (!MyWindow_initialize(&app->window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0))
+  if (!MyWindow_initialize(&app->window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, SDL_WINDOW_HIDDEN))
   {
     LOG_ERROR("Falha ao criar a janela e/ou renderizador: %s", SDL_GetError());
     LOG_DEBUG("<<< initialize()");
     return SDL_APP_FAILURE;
+  }
+
+  // O enunciado exige que a janela principal inicie centralizada no monitor
+  // principal, que não é necessariamente o primeiro da lista do sistema.
+  const SDL_DisplayID primary_display = SDL_GetPrimaryDisplay();
+  const int centered = (int)SDL_WINDOWPOS_CENTERED_DISPLAY(primary_display);
+
+  LOG_DEBUG("\tCentralizando a janela principal no monitor primário (id %u)...", (unsigned)primary_display);
+  SDL_SetWindowPosition(app->window.window, centered, centered);
+  SDL_ShowWindow(app->window.window);
+
+  if (DEBUG_ENABLED)
+  {
+    int x = 0;
+    int y = 0;
+    int w = 0;
+    int h = 0;
+    SDL_Rect bounds = { 0, 0, 0, 0 };
+    SDL_GetWindowPosition(app->window.window, &x, &y);
+    SDL_GetWindowSize(app->window.window, &w, &h);
+    SDL_GetDisplayUsableBounds(primary_display, &bounds);
+    LOG_DEBUG("\tJanela principal: %dx%d em (%d, %d); área útil do monitor: %dx%d em (%d, %d)",
+      w, h, x, y, bounds.w, bounds.h, bounds.x, bounds.y);
   }
 
   LOG_DEBUG("<<< initialize()");
@@ -140,14 +172,50 @@ void shutdown(App *app)
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
+bool compute_image_destination(const App *app, SDL_FRect *destination)
+{
+  if (!app || !app->image.texture || !destination)
+    return false;
+
+  int window_width = 0;
+  int window_height = 0;
+  if (!SDL_GetWindowSize(app->window.window, &window_width, &window_height))
+    return false;
+
+  const float image_width = app->image.rect.w;
+  const float image_height = app->image.rect.h;
+
+  if (image_width <= 0.0f || image_height <= 0.0f || window_width <= 0 || window_height <= 0)
+    return false;
+
+  // Maior fator de escala que mantém a imagem inteira dentro da janela sem
+  // distorcer as proporções. O que sobrar vira margem dos dois lados.
+  const float scale = SDL_min((float)window_width / image_width,
+                              (float)window_height / image_height);
+
+  destination->w = image_width * scale;
+  destination->h = image_height * scale;
+  destination->x = ((float)window_width - destination->w) * 0.5f;
+  destination->y = ((float)window_height - destination->h) * 0.5f;
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
 void render(const App *app)
 {
-  SDL_SetRenderDrawColor(app->window.renderer, 128, 128, 128, 255);
-  SDL_RenderClear(app->window.renderer);
+  SDL_Renderer *renderer = app->window.renderer;
 
-  SDL_RenderTexture(app->window.renderer, app->image.texture, &app->image.rect, &app->image.rect);
+  SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
+  SDL_RenderClear(renderer);
 
-  SDL_RenderPresent(app->window.renderer);
+  SDL_FRect destination = { 0.0f, 0.0f, 0.0f, 0.0f };
+  if (compute_image_destination(app, &destination))
+    SDL_RenderTexture(renderer, app->image.texture, NULL, &destination);
+
+  SDL_RenderPresent(renderer);
 }
 
 //------------------------------------------------------------------------------
@@ -292,27 +360,6 @@ int main(int argc, char *argv[])
       shutdown(&app);
       return EXIT_FAILURE;
     }
-  }
-
-  // Altera tamanho da janela se a imagem for maior do que o tamanho padrão
-  // e reposiciona no canto superior esquerdo da tela.
-  int imageWidth = (int)app.image.rect.w;
-  int imageHeight = (int)app.image.rect.h;
-  if (imageWidth > DEFAULT_WINDOW_WIDTH || imageHeight > DEFAULT_WINDOW_HEIGHT)
-  {
-    // Obtém o tamanho da borda da janela: posicionar a janela na coordenada
-    // (0, 0) faria com que a borda do programa ficasse fora da região da tela.
-    int top = 0;
-    int left = 0;
-    SDL_GetWindowBordersSize(app.window.window, &top, &left, NULL, NULL);
-
-    LOG_DEBUG("Redefinindo dimensões da janela, de (%d, %d) para (%d, %d), e alterando a posição para (%d, %d).",
-      DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, imageWidth, imageHeight, left, top);
-
-    SDL_SetWindowSize(app.window.window, imageWidth, imageHeight);
-    SDL_SetWindowPosition(app.window.window, left, top);
-
-    SDL_SyncWindow(app.window.window);
   }
 
   loop(&app);

@@ -426,3 +426,44 @@ Para exercitar o caminho da imagem que já chega em escala de cinza, foi gerado
 `samples/gray_gradient.png`, um gradiente 256x128 com R = G = B em todos os
 pixels. Com ele o programa informa que a imagem já está em escala de cinza e
 não converte nada.
+
+---
+
+## 2026-09-22 — Item 3 (parte 1): janela principal 1024x768 centralizada
+
+A janela do código-base tinha 640x480 e, logo depois de carregar a imagem, era
+redimensionada para o tamanho da imagem e jogada no canto superior esquerdo. O
+enunciado pede o contrário: a janela principal deve **iniciar** com 1024x768 e
+centralizada no monitor principal. O redimensionamento para o tamanho da imagem
+não desapareceu do projeto — ele passa a ser um dos dois estados do botão do
+item 6, e volta lá.
+
+**Evitando o salto da janela.** A janela é criada com `SDL_WINDOW_HIDDEN`,
+posicionada e só então exibida com `SDL_ShowWindow()`. Criada visível, ela
+apareceria na posição padrão do sistema e saltaria para o centro no quadro
+seguinte.
+
+**Monitor principal, não o primeiro da lista.** A centralização usa
+`SDL_WINDOWPOS_CENTERED_DISPLAY(SDL_GetPrimaryDisplay())`. Um
+`SDL_WINDOWPOS_CENTERED` simples equivale ao display de índice 0, que nem
+sempre é o monitor principal em um sistema com mais de um monitor.
+
+**Desenho da imagem.** O código-base desenhava a textura com o retângulo de
+origem igual ao de destino, ou seja, tamanho natural no canto da janela. Agora
+`compute_image_destination()` calcula a maior escala que cabe na janela sem
+distorcer as proporções e centraliza o resultado, e o que sobra fica como
+margem. A interpretação adotada para "exibir a imagem na resolução 1024x768" é
+essa: a imagem ocupa a maior área possível da janela mantendo as proporções,
+em vez de ser esticada até 1024x768 exatos, o que a deformaria sempre que a
+proporção da imagem fosse diferente de 4:3.
+
+**Verificação.** Com um monitor de área útil 3440x1392, a janela foi reportada
+como 1024x768 na posição (1208, 312) — exatamente `(3440-1024)/2` e
+`(1392-768)/2`. Uma captura de tela confirmou a imagem em escala de cinza,
+escalada para 1024 de largura, centralizada verticalmente e com as margens
+ocupando o resto.
+
+Foi acrescentada a macro `DEBUG_ENABLED` em `log.h`, que permite escrever
+blocos de diagnóstico sem espalhar `#ifdef` pelo meio do código: o compilador
+analisa o bloco nas duas builds e o descarta na otimização quando o valor é
+falso.

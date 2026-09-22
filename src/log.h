@@ -39,6 +39,17 @@
 /**
  * Informação dirigida a quem está usando o programa.
  */
+/**
+ * Permite escrever blocos que só interessam à depuração sem recorrer a #ifdef
+ * no meio do código: o compilador analisa o bloco nas duas builds e o descarta
+ * na otimização quando DEBUG_ENABLED é falso.
+ */
+#ifdef DEBUG
+  #define DEBUG_ENABLED 1
+#else
+  #define DEBUG_ENABLED 0
+#endif
+
 #define LOG_INFO(...) SDL_Log(__VA_ARGS__)
 
 /**
