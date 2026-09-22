@@ -29,7 +29,9 @@
 #include <stdbool.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
-#include <SDL3_image/SDL_image.h>
+
+#include "image.h"
+#include "window.h"
 
 //------------------------------------------------------------------------------
 // Custom types, structs, constants, etc.
@@ -40,21 +42,6 @@ enum constants
 {
   DEFAULT_WINDOW_WIDTH = 640,
   DEFAULT_WINDOW_HEIGHT = 480,
-};
-
-typedef struct MyWindow MyWindow;
-struct MyWindow
-{
-  SDL_Window *window;
-  SDL_Renderer *renderer;
-};
-
-typedef struct MyImage MyImage;
-struct MyImage
-{
-  SDL_Surface *surface;
-  SDL_Texture *texture;
-  SDL_FRect rect;
 };
 
 //------------------------------------------------------------------------------
@@ -70,11 +57,6 @@ static MyImage g_image = {
 //------------------------------------------------------------------------------
 // Function declaration
 //------------------------------------------------------------------------------
-static bool MyWindow_initialize(MyWindow *window, const char *title, int width, int height, SDL_WindowFlags window_flags);
-static void MyWindow_destroy(MyWindow *window);
-static void MyImage_destroy(MyImage *image);
-static bool MyImage_update_texture_with_surface(MyImage* image, SDL_Renderer *renderer, SDL_Surface *surface);
-static bool MyImage_restore_texture(MyImage* image, SDL_Renderer *renderer);
 
 /**
  * Exibe no terminal como o programa deve ser chamado.
@@ -89,219 +71,12 @@ static void print_usage(const char *program_name);
  */
 static bool check_image_path(const char *filename);
 
-/**
- * Carrega a imagem indicada no parâmetro `filename` e a converte para o formato
- * RGBA32, eliminando dependência do formato original da imagem. A imagem
- * carregada é armazenada em output_image.
- * Caso ocorra algum erro no processo, a função retorna false.
- */
-static bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_image);
-
 static void reset_image(void);
 
 static SDL_AppResult initialize(void);
 static void shutdown(void);
 static void render(void);
 static void loop(void);
-
-//------------------------------------------------------------------------------
-//
-//------------------------------------------------------------------------------
-bool MyWindow_initialize(MyWindow *window, const char *title, int width, int height, SDL_WindowFlags window_flags)
-{
-  SDL_Log("\tMyWindow_initialize(%s, %d, %d)", title, width, height);
-
-  if (!window)
-  {
-    SDL_Log("\t\t*** Erro: Janela/renderizador inválidos (window == NULL).");
-    return false;
-  }
-
-  return SDL_CreateWindowAndRenderer(title, width, height, window_flags, &window->window, &window->renderer);
-}
-
-//------------------------------------------------------------------------------
-//
-//------------------------------------------------------------------------------
-void MyWindow_destroy(MyWindow *window)
-{
-  SDL_Log(">>> MyWindow_destroy()");
-
-  if (!window)
-  {
-    SDL_Log("\t*** Erro: Janela/renderizador inválidos (window == NULL).");
-    SDL_Log("<<< MyWindow_destroy()");
-    return;
-  }
-
-  SDL_Log("\tDestruindo MyWindow->renderer...");
-  SDL_DestroyRenderer(window->renderer);
-  window->renderer = NULL;
-
-  SDL_Log("\tDestruindo MyWindow->window...");
-  SDL_DestroyWindow(window->window);
-  window->window = NULL;
-
-  SDL_Log("<<< MyWindow_destroy()");
-}
-
-//------------------------------------------------------------------------------
-//
-//------------------------------------------------------------------------------
-void MyImage_destroy(MyImage *image)
-{
-  SDL_Log(">>> MyImage_destroy()");
-
-  if (!image)
-  {
-    SDL_Log("\t*** Erro: Imagem inválida (image == NULL).");
-    SDL_Log("<<< MyImage_destroy()");
-    return;
-  }
-
-  if (image->texture)
-  {
-    SDL_Log("\tDestruindo MyImage->texture...");
-    SDL_DestroyTexture(image->texture);
-    image->texture = NULL;
-  }
-
-  if (image->surface)
-  {
-    SDL_Log("\tDestruindo MyImage->surface...");
-    SDL_DestroySurface(image->surface);
-    image->surface = NULL;
-  }
-
-  SDL_Log("\tRedefinindo MyImage->rect...");
-  image->rect.x = image->rect.y = image->rect.w = image->rect.h = 0.0f;
-
-  SDL_Log("<<< MyImage_destroy()");
-}
-
-//------------------------------------------------------------------------------
-// 
-//------------------------------------------------------------------------------
-bool MyImage_update_texture_with_surface(MyImage* image, SDL_Renderer *renderer, SDL_Surface *surface)
-{
-  SDL_Log(">>> MyImage_update_texture_with_surface()");
-
-  if (!image)
-  {
-    SDL_Log("\t*** Erro: Imagem inválida (image == NULL).");
-    SDL_Log("<<< MyImage_update_texture_with_surface()");
-    return false;
-  }
-
-  if (!renderer)
-  {
-    SDL_Log("\t*** Erro: Renderer inválido (renderer == NULL).");
-    SDL_Log("<<< MyImage_update_texture_with_surface()");
-    return false;
-  }
-
-  if (!surface)
-  {
-    SDL_Log("\t*** Erro: Superfície inválida (surface == NULL).");
-    SDL_Log("<<< MyImage_update_texture_with_surface()");
-    return false;
-  }
-
-  SDL_DestroyTexture(image->texture);
-
-  image->texture = SDL_CreateTextureFromSurface(renderer, surface);
-  if (!image->texture)
-  {
-    SDL_Log("\t*** Erro ao criar textura: %s", SDL_GetError());
-    SDL_Log("<<< MyImage_update_texture_with_surface()");
-    return false;
-  }
-
-  SDL_Log("\tObtendo dimensões da textura...");
-  SDL_GetTextureSize(image->texture, &image->rect.w, &image->rect.h);
-
-  SDL_Log("<<< MyImage_update_texture_with_surface()");
-  return true;
-}
-
-//------------------------------------------------------------------------------
-//
-//------------------------------------------------------------------------------
-bool MyImage_restore_texture(MyImage* image, SDL_Renderer *renderer)
-{
-  SDL_Log(">>> MyImage_restore_texture()");
-  
-  if (!MyImage_update_texture_with_surface(image, renderer, image->surface))
-  {
-    SDL_Log("\t*** Erro ao restaurar a textura da imagem.");
-    return false;
-  }
-
-  SDL_Log("<<< MyImage_restore_texture()");
-  return true;  
-}
-
-//------------------------------------------------------------------------------
-//
-//------------------------------------------------------------------------------
-bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_image)
-{
-  if (!filename)
-  {
-    SDL_Log(">>> load_rgba32(NULL)");
-    SDL_Log("\t*** Erro: Nome do arquivo inválido (filename == NULL).");
-    SDL_Log("<<< load_rgba32(NULL)");
-    return false;
-  }
-
-  SDL_Log(">>> load_rgba32(\"%s\")", filename);
-
-  if (!renderer)
-  {
-    SDL_Log("\t*** Erro: Renderer inválido (renderer == NULL).");
-    SDL_Log("<<< load_rgba32(\"%s\")", filename);
-    return false;
-  }
-
-  if (!output_image)
-  {
-    SDL_Log("\t*** Erro: Imagem de saída inválida (output_image == NULL).");
-    SDL_Log("<<< load_rgba32(\"%s\")", filename);
-    return false;
-  }
-
-  MyImage_destroy(output_image);
-
-  SDL_Log("\tCarregando imagem \"%s\" em uma superfície...", filename);
-  SDL_Surface *surface = IMG_Load(filename);
-  if (!surface)
-  {
-    SDL_Log("\t*** Erro: formato de imagem inválido ou não suportado em %s (%s)", filename, SDL_GetError());
-    SDL_Log("<<< load_rgba32(\"%s\")", filename);
-    return false;
-  }
-
-  SDL_Log("\tConvertendo superfície para formato RGBA32...");
-  output_image->surface = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
-  SDL_DestroySurface(surface);
-  if (!output_image->surface)
-  {
-    SDL_Log("\t*** Erro ao converter superfície para formato RGBA32: %s", SDL_GetError());
-    SDL_Log("<<< load_rgba32(\"%s\")", filename);
-    return false;
-  }
-
-  SDL_Log("\tCriando textura a partir da superfície...");
-  if (!MyImage_update_texture_with_surface(output_image, renderer, output_image->surface))
-  {
-    SDL_Log("\t*** Erro ao criar textura.");
-    SDL_Log("<<< load_rgba32(\"%s\")", filename);
-    return false;
-  }
-
-  SDL_Log("<<< load_rgba32(\"%s\")", filename);
-  return true;
-}
 
 //------------------------------------------------------------------------------
 // 

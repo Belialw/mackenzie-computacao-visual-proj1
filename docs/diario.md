@@ -243,3 +243,43 @@ explícita de qual exemplo deu origem ao código.
 
 Resultado: de 667 para 511 linhas, build sem nenhum aviso e execução
 verificada.
+
+---
+
+## 2026-09-21 — Refatoração 1/4: separação em headers e arquivos .c
+
+Segunda das quatro refatorações listadas no cabeçalho do arquivo original. O
+programa inteiro vivia em um único `main.c`, e o próprio autor aponta o uso de
+headers e arquivos `.c` separados como o primeiro item a mudar em um projeto
+real.
+
+A divisão adotada:
+
+| Arquivo | Conteúdo |
+| --- | --- |
+| `src/window.h` / `.c` | `MyWindow` e o ciclo de vida da janela e do renderizador |
+| `src/image.h` / `.c` | `MyImage`, carregamento do arquivo e manutenção da textura |
+| `src/main.c` | estado do programa, validação dos argumentos, ciclo de vida da aplicação e loop de eventos |
+
+O critério da separação foi a responsabilidade: `window` cuida do que aparece na
+tela como janela, `image` cuida do que é a imagem em memória, e `main` costura
+os dois. Os módulos `window` e `image` não se conhecem — só o `main.c` inclui
+os dois —, o que evita dependência circular e permite compilar e testar cada um
+isoladamente.
+
+As funções movidas deixaram de ser `static`: antes os protótipos eram
+declarados `static` no topo do arquivo e as definições apareciam sem o
+qualificador, o que só funcionava por estarem na mesma unidade de compilação.
+Agora os protótipos estão nos headers, com documentação de cada função, e as
+definições continuam nos `.c`.
+
+Para não introduzir erro de transcrição, os corpos das funções foram extraídos
+do arquivo original por faixa de linhas em vez de copiados manualmente. O
+comportamento do programa é idêntico ao anterior, verificado nos casos de erro
+e no caminho normal.
+
+Distribuição depois da separação: `main.c` caiu de 511 para 286 linhas, contra
+50 em `window.c` e 169 em `image.c`. O Makefile não precisou de alteração — o
+`$(wildcard $(SRC_DIR)/*.c)` já compila e linka os novos arquivos
+automaticamente, e o rastreio de dependências por `-MMD -MP` passou a
+recompilar os `.c` corretos quando um header muda.
