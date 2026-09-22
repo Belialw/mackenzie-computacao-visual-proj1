@@ -153,3 +153,61 @@ separados:
 2. remover as variáveis globais;
 3. reduzir os logs, desativando-os na build de release;
 4. receber o arquivo de imagem por `argv` no lugar da constante.
+
+---
+
+## 2026-09-21 — Refatoração 4/4: caminho da imagem por argv
+
+Primeira das quatro refatorações listadas no cabeçalho do arquivo original, e
+também o item 1 do escopo obrigatório. A constante `IMAGE_FILENAME` foi
+removida e o programa passou a receber o caminho da imagem como argumento,
+conforme a chamada definida no enunciado.
+
+Foram acrescentadas duas funções: `print_usage()`, que mostra como chamar o
+programa, e `check_image_path()`, que valida o caminho antes de qualquer
+inicialização da SDL. A validação usa `SDL_GetPathInfo()` para distinguir
+"arquivo não existe" de "o caminho é um diretório", o que permite mensagens de
+erro mais específicas. Se o arquivo existe mas não é uma imagem em formato
+suportado, quem detecta é o `IMG_Load()`, e a mensagem de erro correspondente
+em `load_rgba32()` foi reescrita para deixar isso claro.
+
+A validação dos argumentos acontece antes do `atexit(shutdown)` e antes do
+`SDL_Init()`: não faz sentido inicializar subsistema de vídeo para descobrir em
+seguida que o argumento estava errado.
+
+**Bug encontrado no código-base.** Ao recompilar, o gcc acusou:
+
+```
+src/main.c:275:32: warning: '%s' directive argument is null [-Wformat-overflow=]
+```
+
+Dentro do bloco `if (!filename)` de `load_rgba32()`, a variável `filename` é
+comprovadamente `NULL` e ainda assim era passada para um `%s` do `SDL_Log()`.
+Passar `NULL` para `%s` é comportamento indefinido em C. O mesmo vale para o
+log de entrada da função, que acontecia antes da verificação. A correção foi
+mover a verificação de `NULL` para antes do log de entrada e usar texto literal
+nas mensagens desse caminho de erro. A build voltou a ficar sem nenhum aviso
+com `-Wall -Wextra -Wpedantic`.
+
+**Bug encontrado no nosso Makefile.** O alvo `run` falhava com
+`'build' não é reconhecido como um comando interno ou externo`. O `cmd.exe`
+interpreta a barra normal no início de um comando como início de uma opção,
+então `build/imgproc.exe` não é reconhecido como executável. Foi acrescentada a
+variável `RUN_BIN`, que converte o caminho para barras invertidas no Windows.
+Só apareceu porque o alvo foi realmente executado — vale testar cada alvo do
+Makefile, não só o `all`.
+
+**Testes dos caminhos de erro** (todos com mensagem no terminal e saída
+diferente de zero):
+
+| Entrada | Resultado |
+| --- | --- |
+| sem argumento | erro + modo de uso |
+| dois argumentos | erro + modo de uso |
+| `nao_existe.png` | "arquivo não encontrado" |
+| `samples` (diretório) | "é um diretório, não um arquivo de imagem" |
+| arquivo de texto renomeado para `.png` | "formato de imagem inválido ou não suportado" |
+| `samples/kodim23.png` | carrega e exibe corretamente |
+
+No último caso de erro o `shutdown()` roda normalmente, liberando o que já
+tinha sido alocado antes da falha.

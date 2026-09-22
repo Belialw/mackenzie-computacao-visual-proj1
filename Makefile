@@ -115,6 +115,15 @@ OBJS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS := $(OBJS:.o=.d)
 BIN  := $(BUILD_DIR)/$(TARGET)$(EXE)
 
+# O cmd.exe nao aceita "build/imgproc.exe" como comando (interpreta a barra como
+# inicio de uma opcao), entao o alvo "run" precisa do caminho com barra
+# invertida no Windows.
+ifeq ($(OS),Windows_NT)
+  RUN_BIN := $(subst /,\,$(BIN))
+else
+  RUN_BIN := ./$(BIN)
+endif
+
 # Imagem usada por "make run". Sobrescreva com: make run IMG=caminho/imagem.png
 IMG ?= samples/kodim23.png
 
@@ -149,7 +158,7 @@ ifeq ($(OS),Windows_NT)
 endif
 
 run: all
-	$(BIN) $(IMG)
+	$(RUN_BIN) $(IMG)
 
 clean:
 	@$(RM_BUILD)

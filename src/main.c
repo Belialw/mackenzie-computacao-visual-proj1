@@ -45,7 +45,6 @@
 // Custom types, structs, constants, etc.
 //------------------------------------------------------------------------------
 static const char *WINDOW_TITLE = "Filter image";
-static const char *IMAGE_FILENAME = "kodim23.png";
 
 enum constants
 {
@@ -91,6 +90,19 @@ static void MyWindow_destroy(MyWindow *window);
 static void MyImage_destroy(MyImage *image);
 static bool MyImage_update_texture_with_surface(MyImage* image, SDL_Renderer *renderer, SDL_Surface *surface);
 static bool MyImage_restore_texture(MyImage* image, SDL_Renderer *renderer);
+
+/**
+ * Exibe no terminal como o programa deve ser chamado.
+ */
+static void print_usage(const char *program_name);
+
+/**
+ * Verifica se o caminho recebido como argumento do programa aponta para um
+ * arquivo existente, exibindo uma mensagem de erro pertinente no terminal caso
+ * contrário. A validação do conteúdo (se o arquivo é mesmo uma imagem, em um
+ * formato suportado) fica por conta do IMG_Load(), em load_rgba32().
+ */
+static bool check_image_path(const char *filename);
 
 /**
  * Carrega a imagem indicada no parâmetro `filename` e a converte para o formato
@@ -255,14 +267,15 @@ bool MyImage_restore_texture(MyImage* image, SDL_Renderer *renderer)
 //------------------------------------------------------------------------------
 bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_image)
 {
-  SDL_Log(">>> load_rgba32(\"%s\")", filename);
-
   if (!filename)
   {
+    SDL_Log(">>> load_rgba32(NULL)");
     SDL_Log("\t*** Erro: Nome do arquivo inválido (filename == NULL).");
-    SDL_Log("<<< load_rgba32(\"%s\")", filename);
+    SDL_Log("<<< load_rgba32(NULL)");
     return false;
   }
+
+  SDL_Log(">>> load_rgba32(\"%s\")", filename);
 
   if (!renderer)
   {
@@ -284,7 +297,7 @@ bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_i
   SDL_Surface *surface = IMG_Load(filename);
   if (!surface)
   {
-    SDL_Log("\t*** Erro ao carregar a imagem: %s", SDL_GetError());
+    SDL_Log("\t*** Erro: formato de imagem inválido ou não suportado em %s (%s)", filename, SDL_GetError());
     SDL_Log("<<< load_rgba32(\"%s\")", filename);
     return false;
   }
@@ -549,16 +562,72 @@ void loop(void)
 }
 
 //------------------------------------------------------------------------------
-// 
+//
+//------------------------------------------------------------------------------
+void print_usage(const char *program_name)
+{
+  SDL_Log("Uso: %s caminho_da_imagem.ext", program_name);
+  SDL_Log("Exemplo: %s samples/kodim23.png", program_name);
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+bool check_image_path(const char *filename)
+{
+  SDL_PathInfo info = { 0 };
+
+  if (!SDL_GetPathInfo(filename, &info) || info.type == SDL_PATHTYPE_NONE)
+  {
+    SDL_Log("*** Erro: arquivo não encontrado: %s", filename);
+    return false;
+  }
+
+  if (info.type == SDL_PATHTYPE_DIRECTORY)
+  {
+    SDL_Log("*** Erro: %s é um diretório, não um arquivo de imagem.", filename);
+    return false;
+  }
+
+  if (info.type != SDL_PATHTYPE_FILE)
+  {
+    SDL_Log("*** Erro: %s não é um arquivo comum.", filename);
+    return false;
+  }
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+//
 //------------------------------------------------------------------------------
 int main(int argc, char *argv[])
 {
+  if (argc < 2)
+  {
+    SDL_Log("*** Erro: caminho da imagem não informado.");
+    print_usage(argv[0]);
+    return EXIT_FAILURE;
+  }
+
+  if (argc > 2)
+  {
+    SDL_Log("*** Erro: o programa recebe apenas um argumento.");
+    print_usage(argv[0]);
+    return EXIT_FAILURE;
+  }
+
+  const char *image_filename = argv[1];
+
+  if (!check_image_path(image_filename))
+    return EXIT_FAILURE;
+
   atexit(shutdown);
 
   if (initialize() == SDL_APP_FAILURE)
     return SDL_APP_FAILURE;
 
-  if (!load_rgba32(IMAGE_FILENAME, g_window.renderer, &g_image))
+  if (!load_rgba32(image_filename, g_window.renderer, &g_image))
     return SDL_APP_FAILURE;
 
   SDL_Log("Criando cursores do mouse...");
