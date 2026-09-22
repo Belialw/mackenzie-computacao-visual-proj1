@@ -100,6 +100,10 @@ bool MyImage_update_texture_with_surface(MyImage* image, SDL_Renderer *renderer,
     return false;
   }
 
+  // Registra qual surface originou a textura, para que a gravacao em disco
+  // salve exatamente o que esta sendo exibido.
+  image->displayed = surface;
+
   LOG_DEBUG("\tObtendo dimensões da textura...");
   SDL_GetTextureSize(image->texture, &image->rect.w, &image->rect.h);
 
@@ -365,5 +369,46 @@ bool MyImage_apply_mapping(MyImage *image, SDL_Renderer *renderer, const Uint8 *
   }
 
   LOG_DEBUG("<<< MyImage_apply_mapping()");
+  return true;
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+bool MyImage_save_png(const MyImage *image, const char *filename, bool *existed)
+{
+  LOG_DEBUG(">>> MyImage_save_png()");
+
+  if (existed)
+    *existed = false;
+
+  if (!image || !image->displayed)
+  {
+    LOG_ERROR("Não há imagem em exibição para salvar.");
+    LOG_DEBUG("<<< MyImage_save_png()");
+    return false;
+  }
+
+  if (!filename)
+  {
+    LOG_ERROR("Nome de arquivo inválido (filename == NULL).");
+    LOG_DEBUG("<<< MyImage_save_png()");
+    return false;
+  }
+
+  // A existência precisa ser consultada antes da gravação: depois de gravar,
+  // o arquivo existe em qualquer caso e a distinção se perde.
+  SDL_PathInfo info = { 0 };
+  if (existed && SDL_GetPathInfo(filename, &info) && info.type == SDL_PATHTYPE_FILE)
+    *existed = true;
+
+  if (!IMG_SavePNG(image->displayed, filename))
+  {
+    LOG_ERROR("Falha ao salvar %s: %s", filename, SDL_GetError());
+    LOG_DEBUG("<<< MyImage_save_png()");
+    return false;
+  }
+
+  LOG_DEBUG("<<< MyImage_save_png()");
   return true;
 }

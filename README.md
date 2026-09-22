@@ -202,6 +202,22 @@ proporções, centralizada, com o espaço restante como margem. A alternativa
 seria esticá-la até as dimensões exatas da janela, o que deformaria qualquer
 imagem cuja proporção fosse diferente da proporção da janela.
 
+
+### Imagem salva
+
+A tecla `S` grava `output_image.png` no diretório de onde o programa foi
+chamado, sobrescrevendo um arquivo existente e informando no terminal se ele
+foi criado ou sobrescrito.
+
+O arquivo contém a imagem que está sendo exibida — em escala de cinza ou
+equalizada, conforme o estado do botão — sempre na **resolução original da
+imagem de entrada**, e não no tamanho da janela. O enunciado diz "a imagem
+atualmente exibida na janela principal", o que poderia ser lido como o conteúdo
+da janela; a interpretação adotada é que o que muda é *qual* imagem, e não a
+escala com que ela aparece na tela. Salvar o conteúdo da janela introduziria a
+perda de qualidade do redimensionamento em um arquivo que se espera ser o
+resultado do processamento.
+
 ---
 
 ## Contribuições

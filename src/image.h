@@ -28,6 +28,11 @@ struct MyImage
   // `surface` para que a imagem em escala de cinza continue intacta em
   // memória: é ela que MyImage_restore_texture() devolve, sem reler o arquivo.
   SDL_Surface *processed;
+
+  // Aponta para a surface que deu origem à textura em exibição: `surface` ou
+  // `processed`. É ela que a gravação em disco usa, de modo que o arquivo
+  // salvo corresponda ao que está na janela principal.
+  SDL_Surface *displayed;
   SDL_Texture *texture;
   SDL_FRect rect;
 };
@@ -87,5 +92,17 @@ bool MyImage_to_grayscale(MyImage *image, SDL_Renderer *renderer);
  * O canal alpha de cada pixel é preservado.
  */
 bool MyImage_apply_mapping(MyImage *image, SDL_Renderer *renderer, const Uint8 *mapping);
+
+
+/**
+ * Salva em `filename`, no formato PNG, a imagem que está em exibição — isto é,
+ * a surface que originou a textura atual. Um arquivo existente é sobrescrito.
+ *
+ * `existed` recebe true quando o arquivo já estava no disco antes da gravação,
+ * para que a mensagem no terminal possa distinguir criação de sobrescrita. A
+ * verificação precisa acontecer antes de gravar, já que depois não há como
+ * saber se o arquivo é novo.
+ */
+bool MyImage_save_png(const MyImage *image, const char *filename, bool *existed);
 
 #endif // IMAGE_H

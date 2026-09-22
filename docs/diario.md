@@ -922,3 +922,63 @@ ambas no canto superior esquerdo e se sobrepõem, com a secundária à frente po
 ser janela filha. Não é um defeito da implementação: é a consequência direta de
 duas exigências do enunciado que apontam para a mesma coordenada — a secundária
 sempre em (0,0) e a principal também em (0,0) quando não cabe na tela.
+
+---
+
+## 2026-09-22 — Item 7: salvar a imagem exibida
+
+A tecla `S` grava `output_image.png` no diretório de onde o programa foi
+chamado, sobrescrevendo um arquivo existente.
+
+**Distinguir criação de sobrescrita.** O enunciado exige que o terminal informe
+qual das duas aconteceu. A consulta com `SDL_GetPathInfo()` precisa acontecer
+*antes* da gravação: depois de gravar, o arquivo existe nos dois casos e a
+distinção se perde.
+
+**Qual surface é salva.** Em vez de o `main` decidir entre `surface` e
+`processed` a cada gravação, o próprio `MyImage` passou a registrar em
+`displayed` qual surface originou a textura atual. Isso acontece dentro de
+`MyImage_update_texture_with_surface()`, que é por onde toda troca de imagem
+exibida já passava. O arquivo salvo corresponde ao que está na janela por
+construção, e não por acerto entre duas partes do código.
+
+**A tecla vale nas duas janelas.** O evento de teclado é aceito de qualquer uma
+delas. O foco pode muito bem estar na janela secundária quando o usuário decide
+salvar, logo depois de clicar em um botão, e obrigá-lo a clicar na janela
+principal antes seria uma limitação sem motivo.
+
+A resolução do arquivo salvo é sempre a da imagem de entrada, e não o tamanho
+da janela. A justificativa está no README.
+
+### Problema encontrado durante o teste
+
+O primeiro teste automatizado falhou com "Não há imagem em exibição para
+salvar". A causa não era a tecla: a atribuição de `image->displayed` nunca
+tinha entrado no arquivo. A edição que deveria inseri-la usava um padrão com
+`\t` que este `sed` interpreta como tabulação real em vez de barra invertida
+seguida de `t`, e por isso não casou com nenhuma linha. Já tinha acontecido
+antes neste projeto, com uma mensagem de log. A lição prática é conferir o
+resultado de uma edição automatizada em vez de supor que ela foi aplicada — o
+código compilou normalmente, porque um ponteiro nulo é perfeitamente válido
+para o compilador.
+
+Vale registrar que o caminho de erro se comportou como projetado: mensagem
+clara no terminal, sem gravar arquivo e sem travar o programa.
+
+### Verificação
+
+| Ação | Mensagem no terminal | Arquivo |
+| --- | --- | --- |
+| `S` com a imagem em escala de cinza | `Arquivo output_image.png criado.` | 768x512, 365.479 bytes |
+| `S` novamente | `Arquivo output_image.png sobrescrito.` | — |
+| `S` após equalizar | `Arquivo output_image.png sobrescrito.` | 768x512, 339.165 bytes |
+
+Os dois arquivos têm a resolução da imagem de entrada, e não a da janela, e
+conteúdos diferentes entre si, o que confirma que a gravação acompanha o estado
+exibido.
+
+**Nota sobre o teste automatizado.** Um `keybd_event` com scan code zero não
+chega ao programa: foi preciso informar o scan code real da tecla (0x1F para
+`S`). Somado ao clique de ativação que o Windows consome, são dois detalhes do
+sistema que atrapalham o teste de interface por automação, e nenhum deles é
+comportamento do programa.

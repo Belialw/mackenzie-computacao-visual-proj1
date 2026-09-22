@@ -79,6 +79,10 @@ static const char *EQUALIZE_LABEL_APPLY      = "Equalizar histograma";
 static const char *EQUALIZE_LABEL_REVERT      = "Ver original";
 static const char *RESOLUTION_LABEL_ORIGINAL = "Resolução original";
 static const char *RESOLUTION_LABEL_FIT      = "1024x768";
+
+// Nome fixo do arquivo de saída, definido pelo enunciado. O caminho é relativo
+// ao diretório de onde o programa foi chamado.
+static const char *OUTPUT_FILENAME = "output_image.png";
 static const SDL_Color TEXT_COLOR = { 232, 232, 238, 255 };
 static const SDL_Color TEXT_MUTED_COLOR = { 150, 150, 160, 255 };
 
@@ -134,6 +138,11 @@ static bool check_image_path(const char *filename);
  * Alterna a janela principal entre a resolução original da imagem e 1024x768,
  * reposicionando-a conforme ela caiba ou não no monitor.
  */
+/**
+ * Salva a imagem exibida na janela principal em OUTPUT_FILENAME.
+ */
+static void save_image(App *app);
+
 static void toggle_resolution(App *app);
 
 static void toggle_equalization(App *app);
@@ -156,6 +165,29 @@ static void loop(App *app);
 
 //------------------------------------------------------------------------------
 // 
+//------------------------------------------------------------------------------
+void save_image(App *app)
+{
+  LOG_DEBUG(">>> save_image()");
+
+  bool existed = false;
+
+  if (!MyImage_save_png(&app->image, OUTPUT_FILENAME, &existed))
+  {
+    LOG_DEBUG("<<< save_image()");
+    return;
+  }
+
+  if (existed)
+    LOG_INFO("Arquivo %s sobrescrito.", OUTPUT_FILENAME);
+  else
+    LOG_INFO("Arquivo %s criado.", OUTPUT_FILENAME);
+
+  LOG_DEBUG("<<< save_image()");
+}
+
+//------------------------------------------------------------------------------
+//
 //------------------------------------------------------------------------------
 void toggle_resolution(App *app)
 {
@@ -562,6 +594,15 @@ void loop(App *app)
           render_main(app);
         else if (event.window.windowID == secondary_window_id)
           render_secondary(app);
+        break;
+
+      // A tecla S salva a imagem exibida na janela principal. O evento é
+      // aceito vindo de qualquer uma das duas janelas: o foco pode estar na
+      // secundária quando o usuário decide salvar, e exigir que ele clique na
+      // principal antes seria uma limitação sem motivo.
+      case SDL_EVENT_KEY_DOWN:
+        if (!event.key.repeat && event.key.key == SDLK_S)
+          save_image(app);
         break;
 
       // Os botões vivem na janela secundária, então só os eventos de mouse
