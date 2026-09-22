@@ -37,13 +37,25 @@
 //------------------------------------------------------------------------------
 // Custom types, structs, constants, etc.
 //------------------------------------------------------------------------------
-static const char *WINDOW_TITLE = "Projeto 1 - Processamento de imagens";
+static const char *MAIN_WINDOW_TITLE = "Projeto 1 - Processamento de imagens";
+static const char *SECONDARY_WINDOW_TITLE = "Histograma e análise";
 
 enum constants
 {
-  DEFAULT_WINDOW_WIDTH = 1024,
-  DEFAULT_WINDOW_HEIGHT = 768,
+  // Tamanho inicial da janela principal, definido pelo enunciado.
+  MAIN_WINDOW_WIDTH = 1024,
+  MAIN_WINDOW_HEIGHT = 768,
+
+  // Tamanho fixo da janela secundária, escolhido pelo grupo para comportar o
+  // histograma de 256 níveis desenhado a um pixel por nível, as informações de
+  // análise e os dois botões, um abaixo do outro.
+  SECONDARY_WINDOW_WIDTH = 420,
+  SECONDARY_WINDOW_HEIGHT = 560,
 };
+
+// Área reservada ao gráfico do histograma dentro da janela secundária: 256
+// pixels de largura, um por nível de intensidade, centralizada na janela.
+static const SDL_FRect HISTOGRAM_AREA = { 82.0f, 24.0f, 256.0f, 200.0f };
 
 /**
  * Estado da aplicação. Substitui as variáveis globais do código original: em
@@ -53,7 +65,8 @@ enum constants
 typedef struct App App;
 struct App
 {
-  MyWindow window;
+  MyWindow main_window;
+  MyWindow secondary_window;
   MyImage image;
 };
 
@@ -84,6 +97,11 @@ static void shutdown(App *app);
  */
 static bool compute_image_destination(const App *app, SDL_FRect *destination);
 
+/**
+ * Desenha o conteúdo de cada janela. render() atualiza as duas de uma vez.
+ */
+static void render_main(const App *app);
+static void render_secondary(const App *app);
 static void render(const App *app);
 static void loop(App *app);
 
@@ -94,7 +112,7 @@ void reset_image(App *app)
 {
   LOG_DEBUG(">>> reset_image()");
 
-  MyImage_restore_texture(&app->image, app->window.renderer);
+  MyImage_restore_texture(&app->image, app->main_window.renderer);
   render(app);
 
   LOG_DEBUG("<<< reset_image()");
@@ -115,25 +133,59 @@ SDL_AppResult initialize(App *app)
     return SDL_APP_FAILURE;
   }
 
-  // A janela nasce oculta para poder ser posicionada antes de aparecer. Criada
-  // visível, ela surgiria na posição padrão do sistema e só então saltaria
-  // para o centro do monitor.
-  LOG_DEBUG("\tCriando janela e renderizador...");
-  if (!MyWindow_initialize(&app->window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, SDL_WINDOW_HIDDEN))
+  // As duas janelas nascem ocultas para poderem ser posicionadas antes de
+  // aparecer. Criadas visíveis, surgiriam na posição padrão do sistema e
+  // saltariam para o lugar certo no quadro seguinte.
+  LOG_DEBUG("\tCriando a janela principal...");
+  if (!MyWindow_initialize(&app->main_window, MAIN_WINDOW_TITLE, MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT, SDL_WINDOW_HIDDEN))
   {
-    LOG_ERROR("Falha ao criar a janela e/ou renderizador: %s", SDL_GetError());
+    LOG_ERROR("Falha ao criar a janela principal: %s", SDL_GetError());
     LOG_DEBUG("<<< initialize()");
     return SDL_APP_FAILURE;
   }
 
-  // O enunciado exige que a janela principal inicie centralizada no monitor
-  // principal, que não é necessariamente o primeiro da lista do sistema.
+  LOG_DEBUG("\tCriando a janela secundária...");
+  if (!MyWindow_initialize(&app->secondary_window, SECONDARY_WINDOW_TITLE, SECONDARY_WINDOW_WIDTH, SECONDARY_WINDOW_HEIGHT, SDL_WINDOW_HIDDEN))
+  {
+    LOG_ERROR("Falha ao criar a janela secundária: %s", SDL_GetError());
+    LOG_DEBUG("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
+
+  // O enunciado pede a janela secundária como filha da principal. Além do
+  // vínculo lógico, isso faz a secundária acompanhar a principal ao minimizar
+  // e permanecer à frente dela.
+  LOG_DEBUG("\tTornando a janela secundária filha da principal...");
+  if (!SDL_SetWindowParent(app->secondary_window.window, app->main_window.window))
+  {
+    LOG_ERROR("Falha ao vincular a janela secundária à principal: %s", SDL_GetError());
+    LOG_DEBUG("<<< initialize()");
+    return SDL_APP_FAILURE;
+  }
+
+  // Janela principal centralizada no monitor principal, que não é
+  // necessariamente o primeiro da lista do sistema.
   const SDL_DisplayID primary_display = SDL_GetPrimaryDisplay();
   const int centered = (int)SDL_WINDOWPOS_CENTERED_DISPLAY(primary_display);
+  SDL_SetWindowPosition(app->main_window.window, centered, centered);
 
-  LOG_DEBUG("\tCentralizando a janela principal no monitor primário (id %u)...", (unsigned)primary_display);
-  SDL_SetWindowPosition(app->window.window, centered, centered);
-  SDL_ShowWindow(app->window.window);
+  // O item 3 pede a janela secundária na coordenada (0, 0) da tela.
+  // SDL_SetWindowPosition posiciona a área de cliente, então pedir (0, 0)
+  // literal empurra a barra de título e a borda para fora da tela: a janela
+  // fica sem título visível e sem como ser arrastada ou fechada pelo botão.
+  // Deslocar pela espessura da borda encosta a janela inteira no canto
+  // superior esquerdo, que é o que a exigência descreve. O exemplo da
+  // disciplina faz o mesmo ajuste, pelo mesmo motivo.
+  int border_top = 0;
+  int border_left = 0;
+  SDL_GetWindowBordersSize(app->secondary_window.window, &border_top, &border_left, NULL, NULL);
+  SDL_SetWindowPosition(app->secondary_window.window, border_left, border_top);
+  LOG_DEBUG("\tBorda da janela secundária: topo %d, esquerda %d", border_top, border_left);
+
+  // A secundária foi criada oculta explicitamente, então não é reexibida junto
+  // com a principal e precisa ser mostrada por conta própria.
+  SDL_ShowWindow(app->main_window.window);
+  SDL_ShowWindow(app->secondary_window.window);
 
   if (DEBUG_ENABLED)
   {
@@ -142,11 +194,17 @@ SDL_AppResult initialize(App *app)
     int w = 0;
     int h = 0;
     SDL_Rect bounds = { 0, 0, 0, 0 };
-    SDL_GetWindowPosition(app->window.window, &x, &y);
-    SDL_GetWindowSize(app->window.window, &w, &h);
+
     SDL_GetDisplayUsableBounds(primary_display, &bounds);
-    LOG_DEBUG("\tJanela principal: %dx%d em (%d, %d); área útil do monitor: %dx%d em (%d, %d)",
-      w, h, x, y, bounds.w, bounds.h, bounds.x, bounds.y);
+    LOG_DEBUG("\tÁrea útil do monitor primário: %dx%d em (%d, %d)", bounds.w, bounds.h, bounds.x, bounds.y);
+
+    SDL_GetWindowPosition(app->main_window.window, &x, &y);
+    SDL_GetWindowSize(app->main_window.window, &w, &h);
+    LOG_DEBUG("\tJanela principal: %dx%d em (%d, %d)", w, h, x, y);
+
+    SDL_GetWindowPosition(app->secondary_window.window, &x, &y);
+    SDL_GetWindowSize(app->secondary_window.window, &w, &h);
+    LOG_DEBUG("\tJanela secundária: %dx%d em (%d, %d)", w, h, x, y);
   }
 
   LOG_DEBUG("<<< initialize()");
@@ -161,7 +219,10 @@ void shutdown(App *app)
   LOG_DEBUG(">>> shutdown()");
 
   MyImage_destroy(&app->image);
-  MyWindow_destroy(&app->window);
+
+  // A janela filha é destruída antes da janela pai.
+  MyWindow_destroy(&app->secondary_window);
+  MyWindow_destroy(&app->main_window);
 
   LOG_DEBUG("\tEncerrando SDL...");
   SDL_Quit();
@@ -179,7 +240,7 @@ bool compute_image_destination(const App *app, SDL_FRect *destination)
 
   int window_width = 0;
   int window_height = 0;
-  if (!SDL_GetWindowSize(app->window.window, &window_width, &window_height))
+  if (!SDL_GetWindowSize(app->main_window.window, &window_width, &window_height))
     return false;
 
   const float image_width = app->image.rect.w;
@@ -204,9 +265,9 @@ bool compute_image_destination(const App *app, SDL_FRect *destination)
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
-void render(const App *app)
+void render_main(const App *app)
 {
-  SDL_Renderer *renderer = app->window.renderer;
+  SDL_Renderer *renderer = app->main_window.renderer;
 
   SDL_SetRenderDrawColor(renderer, 32, 32, 32, 255);
   SDL_RenderClear(renderer);
@@ -221,11 +282,44 @@ void render(const App *app)
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
+void render_secondary(const App *app)
+{
+  SDL_Renderer *renderer = app->secondary_window.renderer;
+
+  SDL_SetRenderDrawColor(renderer, 24, 24, 28, 255);
+  SDL_RenderClear(renderer);
+
+  // O gráfico do histograma (item 4), as informações de análise (item 4) e os
+  // dois botões (itens 5 e 6) entram nesta janela. Por enquanto só a área
+  // reservada ao gráfico é delimitada.
+  SDL_SetRenderDrawColor(renderer, 70, 70, 80, 255);
+  SDL_RenderRect(renderer, &HISTOGRAM_AREA);
+
+  SDL_RenderPresent(renderer);
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+void render(const App *app)
+{
+  render_main(app);
+  render_secondary(app);
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
 void loop(App *app)
 {
   LOG_DEBUG(">>> loop()");
 
   render(app);
+
+  // As duas janelas têm conteúdo próprio, então cada evento precisa ser
+  // encaminhado para a janela de origem, identificada pelo windowID.
+  const SDL_WindowID main_window_id = SDL_GetWindowID(app->main_window.window);
+  const SDL_WindowID secondary_window_id = SDL_GetWindowID(app->secondary_window.window);
 
   SDL_Event event;
   bool isRunning = true;
@@ -237,6 +331,21 @@ void loop(App *app)
       {
       case SDL_EVENT_QUIT:
         isRunning = false;
+        break;
+
+      // Fechar qualquer uma das janelas encerra o programa. A secundária
+      // concentra os controles, e deixá-la fechada tornaria a equalização e a
+      // troca de resolução inacessíveis.
+      case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+        isRunning = false;
+        break;
+
+      // Redesenha apenas a janela que precisou ser reexibida.
+      case SDL_EVENT_WINDOW_EXPOSED:
+        if (event.window.windowID == main_window_id)
+          render_main(app);
+        else if (event.window.windowID == secondary_window_id)
+          render_secondary(app);
         break;
 
       case SDL_EVENT_KEY_DOWN:
@@ -255,7 +364,7 @@ void loop(App *app)
     // Breve pausa para diminuir o processamento contínuo do programa...
     SDL_Delay(50);
   }
-  
+
   LOG_DEBUG("<<< loop()");
 }
 
@@ -324,7 +433,8 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
 
   App app = {
-    .window = { .window = NULL, .renderer = NULL },
+    .main_window      = { .window = NULL, .renderer = NULL },
+    .secondary_window = { .window = NULL, .renderer = NULL },
     .image = {
       .surface = NULL,
       .texture = NULL,
@@ -338,7 +448,7 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  if (!load_rgba32(image_filename, app.window.renderer, &app.image))
+  if (!load_rgba32(image_filename, app.main_window.renderer, &app.image))
   {
     shutdown(&app);
     return EXIT_FAILURE;
@@ -355,7 +465,7 @@ int main(int argc, char *argv[])
   {
     LOG_INFO("A imagem de entrada é colorida. Convertendo para escala de cinza...");
 
-    if (!MyImage_to_grayscale(&app.image, app.window.renderer))
+    if (!MyImage_to_grayscale(&app.image, app.main_window.renderer))
     {
       shutdown(&app);
       return EXIT_FAILURE;

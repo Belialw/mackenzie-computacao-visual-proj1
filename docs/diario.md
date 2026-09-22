@@ -467,3 +467,57 @@ Foi acrescentada a macro `DEBUG_ENABLED` em `log.h`, que permite escrever
 blocos de diagnóstico sem espalhar `#ifdef` pelo meio do código: o compilador
 analisa o bloco nas duas builds e o descarta na otimização quando o valor é
 falso.
+
+---
+
+## 2026-09-22 — Item 3 (parte 2): janela secundária filha, em (0,0)
+
+Esta é a parte do projeto sem nenhum exemplo no material da disciplina: todos
+os exemplos do professor usam uma única janela.
+
+A `struct App` passou a ter `main_window` e `secondary_window`, e o vínculo de
+parentesco é feito com `SDL_SetWindowParent()`. Além de atender à exigência,
+isso faz a secundária acompanhar a principal ao minimizar e permanecer à frente
+dela.
+
+**Tamanho escolhido: 420x560.** O histograma tem 256 níveis e será desenhado a
+um pixel por nível, então a área do gráfico tem 256 pixels de largura, o que
+evita barras de espessura irregular por arredondamento. Com margem dos dois
+lados sobra espaço para as linhas de informação da análise e para os dois
+botões, um abaixo do outro.
+
+**O (0,0) literal não funciona.** Posicionar a janela em (0, 0) e capturar a
+tela mostrou a janela sem barra de título: `SDL_SetWindowPosition()` posiciona
+a área de cliente, então a decoração fica acima da borda da tela. Na prática a
+janela ficava sem título visível e sem como ser arrastada ou fechada pelo
+botão. A correção consulta `SDL_GetWindowBordersSize()` e desloca a janela pela
+espessura da borda, que neste sistema é 3 à esquerda e 26 no topo. A janela
+inteira passa a encostar no canto superior esquerdo, que é o que a exigência
+descreve. O próprio exemplo `05-filter_image` faz esse ajuste, com um
+comentário explicando o mesmo problema — só que para a janela principal.
+
+Vale registrar que `SDL_GetWindowBordersSize()` devolveu valores corretos mesmo
+com a janela ainda oculta, o que permitiu posicionar antes de exibir e evitar
+que a janela aparecesse no lugar errado e saltasse em seguida.
+
+**Detalhe da documentação da SDL.** Uma janela filha oculta junto com o pai é
+reexibida automaticamente quando o pai reaparece, mas isso só vale para janelas
+que não tiveram o estado oculto definido explicitamente. Como a secundária é
+criada com `SDL_WINDOW_HIDDEN` de propósito, ela precisa do seu próprio
+`SDL_ShowWindow()`.
+
+**Loop de eventos.** Com duas janelas, cada evento passou a ser encaminhado
+pela janela de origem, identificada por `event.window.windowID`. O `render()`
+foi dividido em `render_main()` e `render_secondary()`, e `SDL_EVENT_WINDOW_EXPOSED`
+redesenha apenas a janela que precisou ser reexibida. Essa separação foi feita
+agora de propósito: fazê-la depois, com histograma e botões já implementados,
+custaria muito mais.
+
+Fechar qualquer uma das duas janelas encerra o programa, já que a secundária
+concentra os controles e deixá-la fechada tornaria a equalização e a troca de
+resolução inacessíveis.
+
+**Verificação.** Janela principal 1024x768 em (1208, 312) e secundária 420x560
+em (3, 26). Uma captura de tela do canto superior esquerdo confirmou a janela
+secundária inteira, com barra de título, botões de minimizar, maximizar e
+fechar, e a área reservada ao gráfico do histograma delimitada.
