@@ -608,3 +608,41 @@ inserir bytes de preenchimento no fim das linhas, e em que a varredura por
 
 Nas imagens reais do projeto os totais também conferem: 32768 pixels para
 `gray_gradient.png` (256x128) e 393216 para `kodim23.png` (768x512).
+
+---
+
+## 2026-09-22 — Item 4 (parte 2): desenho do histograma
+
+O critério de avaliação exige que o histograma seja exibido "de forma clara e
+proporcional". A função de desenho ficou no próprio módulo `histogram`, que
+passa a ser dono tanto do cálculo quanto da apresentação dos seus dados — o
+alternativo seria engordar `main.c`, que já concentra bastante coisa.
+
+**Proporcionalidade.** A altura de cada barra é a razão entre a contagem do
+nível e a maior contagem do histograma, multiplicada pela altura da área. Assim
+a barra mais alta sempre ocupa a altura inteira, independentemente do tamanho
+da imagem: um histograma de uma foto de 12 megapixels e o de uma miniatura
+ocupam o mesmo espaço e são igualmente legíveis. Normalizar pelo total de
+pixels, em vez de pelo máximo, achataria o gráfico até a ilegibilidade.
+
+**Um pixel por nível.** A área reservada tem exatamente 256 pixels de largura,
+escolhida lá no dimensionamento da janela secundária justamente para isto: cada
+nível ocupa uma coluna de um pixel e nenhuma barra fica mais grossa que a
+vizinha por arredondamento, que é o que aconteceria ao espremer 256 níveis em
+uma largura arbitrária.
+
+**Clareza.** O fundo da área do gráfico é mais escuro que o da janela, de modo
+que os intervalos sem nenhum pixel continuam visíveis como parte do gráfico em
+vez de sumirem no fundo. Há moldura em volta e rótulos 0, 128 e 255 alinhados
+às posições que representam no eixo.
+
+### Verificação
+
+As duas imagens de teste produzem exatamente o gráfico previsto:
+
+- `gray_gradient.png`, em que os 256 níveis têm a mesma contagem, desenha um
+  bloco sólido preenchendo toda a área — todas as barras na altura máxima, que
+  é a confirmação visual direta da normalização pelo nível mais frequente.
+- `kodim23.png` desenha uma distribuição real, concentrada em torno do nível
+  90 e com um segundo agrupamento perto do 190, condizente com uma fotografia
+  de tons predominantemente médios.

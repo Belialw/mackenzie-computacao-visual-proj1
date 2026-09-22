@@ -9,6 +9,9 @@
 #include "histogram.h"
 #include "log.h"
 
+// Cor dos rótulos do eixo de intensidades do gráfico.
+static const SDL_Color AXIS_LABEL_COLOR = { 150, 150, 160, 255 };
+
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
@@ -72,4 +75,56 @@ bool Histogram_compute(Histogram *histogram, SDL_Surface *surface)
 
   LOG_DEBUG("<<< Histogram_compute()");
   return true;
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+void Histogram_draw(const Histogram *histogram, SDL_Renderer *renderer, const SDL_FRect *area, const TextRenderer *text)
+{
+  if (!histogram || !renderer || !area)
+    return;
+
+  // Fundo da área do gráfico, mais escuro que o da janela, para delimitar onde
+  // o histograma começa e termina mesmo nos níveis sem nenhum pixel.
+  SDL_SetRenderDrawColor(renderer, 14, 14, 18, 255);
+  SDL_RenderFillRect(renderer, area);
+
+  if (histogram->max_count > 0)
+  {
+    SDL_SetRenderDrawColor(renderer, 118, 170, 240, 255);
+
+    for (int level = 0; level < HISTOGRAM_LEVELS; ++level)
+    {
+      if (histogram->counts[level] <= 0)
+        continue;
+
+      const float ratio = (float)histogram->counts[level] / (float)histogram->max_count;
+      const float bar_height = ratio * area->h;
+
+      // Cada nível ocupa uma coluna de um pixel, e a barra cresce de baixo
+      // para cima a partir da base da área.
+      const SDL_FRect bar = {
+        area->x + (float)level,
+        area->y + area->h - bar_height,
+        1.0f,
+        bar_height
+      };
+
+      SDL_RenderFillRect(renderer, &bar);
+    }
+  }
+
+  SDL_SetRenderDrawColor(renderer, 70, 70, 80, 255);
+  SDL_RenderRect(renderer, area);
+
+  // Rótulos do eixo das intensidades, alinhados às posições que representam.
+  if (text)
+  {
+    const float label_y = area->y + area->h + 4.0f;
+
+    Text_draw(text, renderer, area->x - 3.0f, label_y, AXIS_LABEL_COLOR, "0");
+    Text_draw(text, renderer, area->x + 128.0f - 11.0f, label_y, AXIS_LABEL_COLOR, "128");
+    Text_draw(text, renderer, area->x + 255.0f - 22.0f, label_y, AXIS_LABEL_COLOR, "255");
+  }
 }

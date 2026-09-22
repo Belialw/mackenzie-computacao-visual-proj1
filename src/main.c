@@ -309,15 +309,12 @@ void render_secondary(const App *app)
   SDL_RenderClear(renderer);
 
   Text_draw(&app->text, renderer, HISTOGRAM_AREA.x, 2.0f, TEXT_COLOR, "Histograma");
+  Histogram_draw(&app->histogram, renderer, &HISTOGRAM_AREA, &app->text);
 
-  // O gráfico do histograma e as informações de análise (item 4) e os dois
-  // botões (itens 5 e 6) entram nesta janela. Por enquanto só a área reservada
-  // ao gráfico é delimitada.
-  SDL_SetRenderDrawColor(renderer, 70, 70, 80, 255);
-  SDL_RenderRect(renderer, &HISTOGRAM_AREA);
-
-  Text_draw(&app->text, renderer, 32.0f, 244.0f, TEXT_COLOR, "Informações da imagem");
-  Text_draw(&app->text, renderer, 32.0f, 272.0f, TEXT_MUTED_COLOR, "Brilho e contraste: itens 4 e 5.");
+  // As informações de análise (item 4) e os dois botões (itens 5 e 6) entram
+  // abaixo do gráfico.
+  Text_draw(&app->text, renderer, 32.0f, 258.0f, TEXT_COLOR, "Informações da imagem");
+  Text_draw(&app->text, renderer, 32.0f, 286.0f, TEXT_MUTED_COLOR, "Brilho e contraste: item 4.");
 
   SDL_RenderPresent(renderer);
 }

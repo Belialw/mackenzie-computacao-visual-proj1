@@ -14,6 +14,8 @@
 #include <stdbool.h>
 #include <SDL3/SDL.h>
 
+#include "text.h"
+
 enum
 {
   // Um nível para cada intensidade possível em 8 bits.
@@ -43,5 +45,19 @@ struct Histogram
  * Retorna false, sem alterar `histogram`, caso os parâmetros sejam inválidos.
  */
 bool Histogram_compute(Histogram *histogram, SDL_Surface *surface);
+
+
+/**
+ * Desenha o gráfico do histograma dentro de `area`, que deve ter exatamente
+ * HISTOGRAM_LEVELS pixels de largura para que cada nível ocupe uma coluna de
+ * um pixel, sem barras de espessura irregular por arredondamento.
+ *
+ * A altura de cada barra é proporcional ao nível mais frequente, de modo que a
+ * barra mais alta sempre ocupe toda a altura da área, independentemente do
+ * tamanho da imagem.
+ *
+ * `text` pode ser nulo, caso em que os rótulos do eixo não são desenhados.
+ */
+void Histogram_draw(const Histogram *histogram, SDL_Renderer *renderer, const SDL_FRect *area, const TextRenderer *text);
 
 #endif // HISTOGRAM_H
