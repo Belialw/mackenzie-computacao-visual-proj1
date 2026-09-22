@@ -50,4 +50,11 @@ void Text_shutdown(TextRenderer *text);
  */
 bool Text_draw(const TextRenderer *text, SDL_Renderer *renderer, float x, float y, SDL_Color color, const char *string);
 
+
+/**
+ * Mede a largura e a altura que `string` ocuparia ao ser desenhada, sem
+ * desenhá-la. Usado para centralizar rótulos dentro dos botões.
+ */
+bool Text_measure(const TextRenderer *text, const char *string, int *width, int *height);
+
 #endif // TEXT_H

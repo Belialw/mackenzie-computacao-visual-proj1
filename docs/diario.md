@@ -701,3 +701,55 @@ O quarto caso confirma o máximo teórico de 127,5 para o desvio padrão, e o
 quinto confirma o comportamento junto ao limiar de 85.
 
 Com isso o item 4 se encerra, e com ele os 2,50 pontos de maior peso do escopo.
+
+---
+
+## 2026-09-22 — Itens 5 e 6 (parte 1): widget de botão
+
+Os itens 5 e 6 do escopo exigem, cada um, um botão "desenhado com primitivas da
+SDL" cujo estado "reflita as ações do usuário". Como os dois botões têm
+exatamente o mesmo comportamento e diferem só na ação, foi feito um módulo
+`button` reutilizado pelos dois, em vez de duplicar a lógica.
+
+**Desenho.** `SDL_RenderFillRect` para o corpo e `SDL_RenderRect` para a
+borda, mais o rótulo por cima. Nenhuma imagem envolvida, como o enunciado
+exige. Para centralizar o rótulo foi preciso saber quanto ele mede antes de
+desenhar, então o módulo `text` ganhou `Text_measure()`, que consulta
+`TTF_GetStringSize()` sem renderizar nada.
+
+**Os três estados.** As cores seguem a sugestão do próprio enunciado: azul no
+estado neutro, azul claro com o ponteiro sobre o botão e azul escuro com o
+botão pressionado.
+
+**Semântica do clique.** A ação só é disparada quando o clique começa e termina
+dentro do botão. Pressionar sobre o botão, arrastar o ponteiro para fora e
+soltar cancela a ação — é o comportamento que qualquer interface tem, e que o
+usuário espera ao perceber que clicou no lugar errado. Enquanto o botão do
+mouse está pressionado, o estado visual permanece "pressionado" mesmo que o
+ponteiro saia da área, e só é reavaliado quando o mouse é solto.
+
+**Redesenho sob demanda.** Cada função de tratamento devolve se o estado visual
+mudou, e a janela só é redesenhada quando mudou de fato. O programa não tem
+laço de renderização contínua: desenha em resposta a eventos, o que evita
+consumir processador à toa enquanto nada acontece na tela.
+
+Os eventos de mouse são filtrados pelo `windowID` da janela secundária, já que
+é lá que os botões vivem, e as coordenadas da SDL já chegam relativas à janela.
+O evento `SDL_EVENT_WINDOW_MOUSE_LEAVE` devolve os botões ao estado neutro
+quando o ponteiro sai da janela — sem isso, um botão destacado continuaria
+destacado indefinidamente.
+
+### Verificação
+
+Os três estados foram conferidos movendo o cursor por código e capturando a
+tela em cada situação:
+
+| Estado | Resultado |
+| --- | --- |
+| ponteiro longe dos botões | ambos em azul neutro |
+| ponteiro sobre o primeiro botão | só ele em azul claro |
+| botão do mouse pressionado sobre ele | só ele em azul escuro |
+
+As ações ainda não estão ligadas: por ora o clique apenas registra no log de
+depuração. A equalização, a alternância e a troca de resolução entram nos
+próximos três commits.

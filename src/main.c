@@ -30,6 +30,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include "button.h"
 #include "histogram.h"
 #include "image.h"
 #include "text.h"
@@ -64,6 +65,18 @@ static const float FONT_SIZE = 15.0f;
 
 // Margem esquerda do bloco de informações da análise, na janela secundária.
 static const float INFO_X = 24.0f;
+
+//------------------------------------------------------------------------------
+// Os dois botões ficam um abaixo do outro, na parte de baixo da janela
+// secundária: o de equalização abaixo do histograma e o de resolução abaixo
+// dele, na ordem que o enunciado descreve.
+//------------------------------------------------------------------------------
+static const SDL_FRect EQUALIZE_BUTTON_AREA   = { 24.0f, 400.0f, 372.0f, 44.0f };
+static const SDL_FRect RESOLUTION_BUTTON_AREA = { 24.0f, 456.0f, 372.0f, 44.0f };
+
+// Cada rótulo descreve a ação do próximo clique, e não o estado atual.
+static const char *EQUALIZE_LABEL_APPLY      = "Equalizar histograma";
+static const char *RESOLUTION_LABEL_ORIGINAL = "Resolução original";
 static const SDL_Color TEXT_COLOR = { 232, 232, 238, 255 };
 static const SDL_Color TEXT_MUTED_COLOR = { 150, 150, 160, 255 };
 
@@ -80,6 +93,10 @@ struct App
   MyImage image;
   TextRenderer text;
   Histogram histogram;
+
+  // Os dois botoes de acao da janela secundaria (itens 5 e 6 do escopo).
+  Button equalize_button;
+  Button resolution_button;
 };
 
 //------------------------------------------------------------------------------
@@ -208,6 +225,9 @@ SDL_AppResult initialize(App *app)
     return SDL_APP_FAILURE;
   }
 
+  Button_initialize(&app->equalize_button, EQUALIZE_BUTTON_AREA, EQUALIZE_LABEL_APPLY);
+  Button_initialize(&app->resolution_button, RESOLUTION_BUTTON_AREA, RESOLUTION_LABEL_ORIGINAL);
+
   if (DEBUG_ENABLED)
   {
     int x = 0;
@@ -332,6 +352,9 @@ void render_secondary(const App *app)
   SDL_snprintf(line, sizeof(line), "Contraste %s", Histogram_contrast_label(&app->histogram));
   Text_draw(&app->text, renderer, INFO_X, 356.0f, TEXT_COLOR, line);
 
+  Button_draw(&app->equalize_button, renderer, &app->text);
+  Button_draw(&app->resolution_button, renderer, &app->text);
+
   SDL_RenderPresent(renderer);
 }
 
@@ -383,6 +406,63 @@ void loop(App *app)
           render_main(app);
         else if (event.window.windowID == secondary_window_id)
           render_secondary(app);
+        break;
+
+
+      // Os botões vivem na janela secundária, então só os eventos de mouse
+      // vindos dela interessam. As coordenadas já chegam relativas à janela.
+      case SDL_EVENT_MOUSE_MOTION:
+        if (event.motion.windowID == secondary_window_id)
+        {
+          const bool a = Button_handle_mouse_motion(&app->equalize_button, event.motion.x, event.motion.y);
+          const bool b = Button_handle_mouse_motion(&app->resolution_button, event.motion.x, event.motion.y);
+
+          if (a || b)
+            render_secondary(app);
+        }
+        break;
+
+      case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        if (event.button.windowID == secondary_window_id && event.button.button == SDL_BUTTON_LEFT)
+        {
+          const bool a = Button_handle_mouse_down(&app->equalize_button, event.button.x, event.button.y);
+          const bool b = Button_handle_mouse_down(&app->resolution_button, event.button.x, event.button.y);
+
+          if (a || b)
+            render_secondary(app);
+        }
+        break;
+
+      case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (event.button.windowID == secondary_window_id && event.button.button == SDL_BUTTON_LEFT)
+        {
+          bool equalize_activated = false;
+          bool resolution_activated = false;
+
+          const bool a = Button_handle_mouse_up(&app->equalize_button, event.button.x, event.button.y, &equalize_activated);
+          const bool b = Button_handle_mouse_up(&app->resolution_button, event.button.x, event.button.y, &resolution_activated);
+
+          if (equalize_activated)
+            LOG_DEBUG("Botão de equalização acionado.");
+
+          if (resolution_activated)
+            LOG_DEBUG("Botão de resolução acionado.");
+
+          if (a || b)
+            render_secondary(app);
+        }
+        break;
+
+      // Sem o ponteiro sobre a janela, nenhum botão pode estar destacado.
+      case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+        if (event.window.windowID == secondary_window_id)
+        {
+          const bool a = Button_handle_mouse_motion(&app->equalize_button, -1.0f, -1.0f);
+          const bool b = Button_handle_mouse_motion(&app->resolution_button, -1.0f, -1.0f);
+
+          if (a || b)
+            render_secondary(app);
+        }
         break;
 
       case SDL_EVENT_KEY_DOWN:
@@ -474,6 +554,8 @@ int main(int argc, char *argv[])
     .secondary_window = { .window = NULL, .renderer = NULL },
     .text = { .font = NULL, .initialized = false },
     .histogram = { .counts = { 0 }, .max_count = 0, .total_pixels = 0 },
+    .equalize_button   = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
+    .resolution_button = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
     .image = {
       .surface = NULL,
       .texture = NULL,

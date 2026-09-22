@@ -137,3 +137,21 @@ bool Text_draw(const TextRenderer *text, SDL_Renderer *renderer, float x, float 
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+bool Text_measure(const TextRenderer *text, const char *string, int *width, int *height)
+{
+  if (width)
+    *width = 0;
+
+  if (height)
+    *height = 0;
+
+  if (!text || !text->font || !string)
+    return false;
+
+  // O comprimento zero indica à SDL_ttf que a string termina em nulo.
+  return TTF_GetStringSize(text->font, string, 0, width, height);
+}

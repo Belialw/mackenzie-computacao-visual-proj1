@@ -10,7 +10,7 @@ Ciência da Computação — **Computação Visual** — Prof. André Kishimoto
 | Nome completo | RA |
 | --- | --- |
 | Enzo Ponte Gamberi | 10389931 |
-| Luís Henrique Ribeiro Fernandes | 10420046 |
+| Luís Henrique Ribeiro Fernandes | 10420079 |
 | Raphael Grizante da Silva | 10416979 |
 | Vinícius Brait Lorimier | 10420046 |
 
