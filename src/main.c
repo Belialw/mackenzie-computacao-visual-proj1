@@ -2,33 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //------------------------------------------------------------------------------
-// Exemplo: 05-filter_image
-// O programa carrega o arquivo de imagem indicado na constante IMAGE_FILENAME
-// e exibe o conteúdo na janela ("kodim23.png" pertence ao "Kodak Image Set").
+// Projeto 1 - Computação Visual (UPM FCI CC)
+// Prof. André Kishimoto
 //
-// Caso a imagem seja maior do que WINDOW_WIDTHxWINDOW_HEIGHT, a janela é
-// redimensionada logo após a imagem ser carregada.
+// Integrantes:
+//   Enzo Ponte Gamberi              - RA 10389931
+//   Luís Henrique Ribeiro Fernandes - RA 10420046
+//   Raphael Grizante da Silva       - RA 10416979
+//   Vinícius Brait Lorimier         - RA 10420046
 //
-// As teclas '0' e 'R' restauram a imagem original e a exibe na janela.
-// As teclas '1' a '9' aplicam um filtro de média na imagem original e exibem
-// a imagem filtrada na janela (cada tecla corresponde a um tamanho diferente
-// do filtro - veja o código da função loop()).
+// Programa de processamento de imagens: carrega a imagem informada na linha de
+// comando, converte para escala de cinza e permite analisá-la e processá-la em
+// uma interface gráfica de duas janelas.
 //
-// Observações:
-// O código não está focado em performance e filtros grandes (ex. 29x29) levam
-// um certo tempo para processar toda a imagem. Para indicar que o programa
-// ainda está filtrando a imagem, o cursor do mouse é alterado para um
-// SDL_SYSTEM_CURSOR_WAIT e volta para o padrão após a filtragem ser concluída.
+//   imgproc caminho_da_imagem.ext
 //
-// Em um projeto mais realista, o código abaixo provavelmente seria refatorado.
-// Alguns exemplos de refatoração do projeto:
-// - Uso de headers (.h) e outros arquivos .c (ex. estruturas e operações
-//   relacionadas à imagens);
-// - Remoção de variáveis globais;
-// - Redução de logs (ou melhor, seriam desativados na build release);
-// - Arquivo de imagem seria um parâmetro do programa (argv), ao invés de ser
-//   uma string constante IMAGE_FILENAME.
-//------------------------------------------------------------------------------
+// Baseado no exemplo src/05-filter_image do repositório da disciplina
+// (https://github.com/profkishimoto/CompVis262), de autoria do professor.
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -77,11 +67,6 @@ static MyImage g_image = {
   .rect = { .x = 0.0f, .y = 0.0f, .w = 0.0f, .h = 0.0f }
 };
 
-static SDL_Surface *surfaceFilter = NULL;
-
-static SDL_Cursor *defaultMouseCursor = NULL;
-static SDL_Cursor *hourglassMouseCursor = NULL;
-
 //------------------------------------------------------------------------------
 // Function declaration
 //------------------------------------------------------------------------------
@@ -111,12 +96,6 @@ static bool check_image_path(const char *filename);
  * Caso ocorra algum erro no processo, a função retorna false.
  */
 static bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_image);
-
-/**
- * Aplica um filtro de média na imagem original, salva o resultado na variável
- * global surfaceFilter e atualiza o conteúdo da janela.
- */
-static bool MyImage_blur(MyImage* image, SDL_Renderer *renderer, Uint32 filter_size);
 
 static void reset_image(void);
 
@@ -325,114 +304,6 @@ bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_i
 }
 
 //------------------------------------------------------------------------------
-//
-//------------------------------------------------------------------------------
-bool MyImage_blur(MyImage* image, SDL_Renderer *renderer, Uint32 filter_size)
-{
-  SDL_Log(">>> MyImage_blur(filter_size: %u)", filter_size);
-
-  if (!image || !image->surface)
-  {
-    SDL_Log("\t*** Erro: Imagem inválida (image == NULL ou image->surface == NULL).");
-    SDL_Log("<<< MyImage_blur(filter_size: %u)", filter_size);
-    return false;
-  }
-
-  if (!renderer)
-  {
-    SDL_Log("\t*** Erro: Renderer inválido (renderer == NULL).");
-    SDL_Log("<<< MyImage_blur(filter_size: %u)", filter_size);
-    return false;
-  }
-
-  if (!surfaceFilter)
-  {
-    surfaceFilter = SDL_CreateSurface(g_image.surface->w, g_image.surface->h, g_image.surface->format);
-    if (!surfaceFilter)
-    {
-      SDL_Log("*** Erro: Superfície extra (filter) inválida!");
-      SDL_Log("<<< MyImage_blur(filter_size: %u)", filter_size);
-      return false;
-    }
-  }
-
-  SDL_Log("\tExecutando blur com filter_size: %u...", filter_size);
-  SDL_SetCursor(hourglassMouseCursor);
-
-  SDL_LockSurface(image->surface);
-  SDL_LockSurface(surfaceFilter);
-
-  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(image->surface->format);
-  Uint32 *pixels = (Uint32 *)image->surface->pixels;
-  Uint32 *output = (Uint32 *)surfaceFilter->pixels;
-  
-  const int filterFinalSize = filter_size * filter_size;
-  const int filterHalfSize = filter_size >> 1;
-  const float average = 1.0f / filterFinalSize;
-
-  SDL_Color filter[filterFinalSize] = { };
-  SDL_Color filteredPixel = { .r = 0, .g = 0, .b = 0, .a = 255 };
-  Uint32 r = 0;
-  Uint32 g = 0;
-  Uint32 b = 0;
-  Uint32 filterIndex = 0;
-  
-  for (int row = 0; row < image->surface->h; ++row)
-  {
-    for (int col = 0; col < image->surface->w; ++col)
-    {
-      // Obtém as intensidades de cada pixel que "batem" com o filtro.
-      filterIndex = 0;
-      for (int rowNeighbour = -filterHalfSize; rowNeighbour <= filterHalfSize; ++rowNeighbour)
-      {
-        for (int colNeighbour = -filterHalfSize; colNeighbour <= filterHalfSize; ++colNeighbour)
-        {
-          // Casos em que parte do filtro está fora da imagem. Neste exemplo,
-          // apenas zeramos a intensidade das posições fora da imagem.
-          if ((row + rowNeighbour < 0) || (row + rowNeighbour >= image->surface->h)
-            || (col + colNeighbour < 0) || (col + colNeighbour >= image->surface->w))
-          {
-            filter[filterIndex].r = filter[filterIndex].g = filter[filterIndex].b = 0;
-          }
-          else
-          {
-            SDL_GetRGB(pixels[((row + rowNeighbour) * image->surface->w + (col + colNeighbour))], format, NULL,
-              &filter[filterIndex].r, &filter[filterIndex].g, &filter[filterIndex].b);
-          }
-          ++filterIndex;
-        }
-      }
-    
-      // Calcula a média dos pixels usados na filtragem e salva na saída.
-      r = g = b = 0;
-      for (int i = 0; i < filterFinalSize; ++i)
-      {
-        r += filter[i].r;
-        g += filter[i].g;
-        b += filter[i].b;
-      }
-      filteredPixel.r = (Uint8)(r * average);
-      filteredPixel.g = (Uint8)(g * average);
-      filteredPixel.b = (Uint8)(b * average);
-
-      output[row * image->surface->w + col] = SDL_MapRGB(format, NULL, filteredPixel.r, filteredPixel.g, filteredPixel.b);
-    }
-  }  
-
-  SDL_UnlockSurface(surfaceFilter);
-  SDL_UnlockSurface(image->surface);
-
-  MyImage_update_texture_with_surface(image, renderer, surfaceFilter);
-  render();
-
-  SDL_Log("\tBlur com filter_size: %u finalizado...", filter_size);
-  SDL_SetCursor(defaultMouseCursor);
-
-  SDL_Log("<<< MyImage_blur(filter_size: %u)", filter_size);
-  return true;
-}
-
-//------------------------------------------------------------------------------
 // 
 //------------------------------------------------------------------------------
 void reset_image(void)
@@ -478,16 +349,6 @@ SDL_AppResult initialize(void)
 void shutdown(void)
 {
   SDL_Log(">>> shutdown()");
-
-  SDL_Log("Destruindo cursores do mouse...");
-  SDL_DestroyCursor(hourglassMouseCursor);
-  SDL_DestroyCursor(defaultMouseCursor);
-  defaultMouseCursor = NULL;
-  hourglassMouseCursor = NULL;
-
-  SDL_Log("Destruindo superfície extra (filter)...");
-  SDL_DestroySurface(surfaceFilter);
-  surfaceFilter = NULL;
 
   MyImage_destroy(&g_image);
   MyWindow_destroy(&g_window);
@@ -539,15 +400,6 @@ void loop(void)
           {
             case SDLK_R: // fallthrough.
             case SDLK_0: reset_image(); break;
-            case SDLK_1: MyImage_blur(&g_image, g_window.renderer, 3); break;
-            case SDLK_2: MyImage_blur(&g_image, g_window.renderer, 5); break;
-            case SDLK_3: MyImage_blur(&g_image, g_window.renderer, 7); break;
-            case SDLK_4: MyImage_blur(&g_image, g_window.renderer, 11); break;
-            case SDLK_5: MyImage_blur(&g_image, g_window.renderer, 15); break;
-            case SDLK_6: MyImage_blur(&g_image, g_window.renderer, 29); break;
-            case SDLK_7: MyImage_blur(&g_image, g_window.renderer, 41); break;
-            case SDLK_8: MyImage_blur(&g_image, g_window.renderer, 73); break;
-            case SDLK_9: MyImage_blur(&g_image, g_window.renderer, 101); break;
           }
         }
         break;
@@ -629,14 +481,6 @@ int main(int argc, char *argv[])
 
   if (!load_rgba32(image_filename, g_window.renderer, &g_image))
     return SDL_APP_FAILURE;
-
-  SDL_Log("Criando cursores do mouse...");
-  defaultMouseCursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
-  hourglassMouseCursor = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAIT);
-  SDL_SetCursor(defaultMouseCursor);
-
-  SDL_Log("Criando superfície extra (filter)...");
-  surfaceFilter = SDL_CreateSurface(g_image.surface->w, g_image.surface->h, g_image.surface->format);
 
   // Altera tamanho da janela se a imagem for maior do que o tamanho padrão
   // e reposiciona no canto superior esquerdo da tela.

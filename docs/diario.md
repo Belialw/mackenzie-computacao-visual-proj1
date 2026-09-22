@@ -211,3 +211,35 @@ diferente de zero):
 
 No último caso de erro o `shutdown()` roda normalmente, liberando o que já
 tinha sido alocado antes da falha.
+
+---
+
+## 2026-09-21 — Remoção do filtro de média e adaptação do cabeçalho
+
+O exemplo `05-filter_image` foi escolhido como base pela infraestrutura de
+carregamento e manipulação de pixels, não pelo filtro em si. O filtro de média
+é a funcionalidade de demonstração do exemplo e não aparece em nenhum item do
+escopo obrigatório do projeto.
+
+Manter esse código até as próximas refatorações significaria adaptá-lo à nova
+estrutura de módulos e à remoção de variáveis globais para só então apagá-lo.
+Por isso a remoção veio antes: `MyImage_blur()` e tudo que existia apenas para
+atendê-lo saiu do arquivo, a saber, a superfície de trabalho `surfaceFilter`,
+os dois cursores de mouse (que existiam só para indicar o processamento em
+andamento durante a filtragem), as teclas `1` a `9` e as respectivas limpezas
+no `shutdown()`.
+
+O que foi preservado é justamente o que o projeto vai usar: `load_rgba32()`,
+`MyImage_update_texture_with_surface()`, `MyImage_restore_texture()` e a lógica
+de redimensionar e reposicionar a janela com `SDL_GetWindowBordersSize()`. As
+teclas `0` e `R`, que restauram a imagem original a partir da surface em
+memória, também ficaram: é exatamente o mecanismo que o item 5 do escopo exige
+para reverter a equalização sem recarregar o arquivo.
+
+O cabeçalho do arquivo, que descrevia o exemplo, foi substituído pela descrição
+do projeto e pela identificação do grupo. A linha de copyright e o
+identificador de licença do autor original foram mantidos, com a indicação
+explícita de qual exemplo deu origem ao código.
+
+Resultado: de 667 para 511 linhas, build sem nenhum aviso e execução
+verificada.
