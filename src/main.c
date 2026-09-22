@@ -76,6 +76,7 @@ static const SDL_FRect RESOLUTION_BUTTON_AREA = { 24.0f, 456.0f, 372.0f, 44.0f }
 
 // Cada rótulo descreve a ação do próximo clique, e não o estado atual.
 static const char *EQUALIZE_LABEL_APPLY      = "Equalizar histograma";
+static const char *EQUALIZE_LABEL_REVERT      = "Ver original";
 static const char *RESOLUTION_LABEL_ORIGINAL = "Resolução original";
 static const SDL_Color TEXT_COLOR = { 232, 232, 238, 255 };
 static const SDL_Color TEXT_MUTED_COLOR = { 150, 150, 160, 255 };
@@ -97,6 +98,10 @@ struct App
   // Os dois botoes de acao da janela secundaria (itens 5 e 6 do escopo).
   Button equalize_button;
   Button resolution_button;
+
+  // Indica se a janela principal exibe a imagem equalizada ou a original em
+  // escala de cinza.
+  bool equalized;
 };
 
 //------------------------------------------------------------------------------
@@ -116,13 +121,11 @@ static void print_usage(const char *program_name);
  */
 static bool check_image_path(const char *filename);
 
-static void reset_image(App *app);
-
 /**
- * Equaliza o histograma da imagem em escala de cinza e atualiza as duas
- * janelas com o resultado.
+ * Alterna entre a imagem equalizada e a imagem em escala de cinza original,
+ * atualizando o rótulo do botão, o histograma e as duas janelas.
  */
-static void equalize_image(App *app);
+static void toggle_equalization(App *app);
 
 static SDL_AppResult initialize(App *app);
 static void shutdown(App *app);
@@ -143,59 +146,81 @@ static void loop(App *app);
 //------------------------------------------------------------------------------
 // 
 //------------------------------------------------------------------------------
-void equalize_image(App *app)
+void toggle_equalization(App *app)
 {
-  LOG_DEBUG(">>> equalize_image()");
+  LOG_DEBUG(">>> toggle_equalization()");
 
-  // O mapeamento é sempre calculado a partir do histograma da imagem em escala
-  // de cinza, e não do que está exibido no momento. Assim equalizar duas vezes
-  // produz o mesmo resultado, em vez de equalizar o que já foi equalizado.
-  Histogram base = { .counts = { 0 }, .max_count = 0, .total_pixels = 0, .mean = 0.0f, .stddev = 0.0f };
-
-  if (!Histogram_compute(&base, app->image.surface))
+  if (app->equalized)
   {
-    LOG_DEBUG("<<< equalize_image()");
-    return;
+    // A imagem em escala de cinza nunca saiu da memória: voltar a exibi-la é
+    // apenas reconstruir a textura a partir dela, sem reler o arquivo do
+    // disco, como o enunciado exige.
+    if (!MyImage_restore_texture(&app->image, app->main_window.renderer))
+    {
+      LOG_DEBUG("<<< toggle_equalization()");
+      return;
+    }
+
+    if (!Histogram_compute(&app->histogram, app->image.surface))
+    {
+      LOG_DEBUG("<<< toggle_equalization()");
+      return;
+    }
+
+    app->equalized = false;
+    Button_set_label(&app->equalize_button, EQUALIZE_LABEL_APPLY);
+
+    LOG_INFO("Imagem restaurada para a escala de cinza original: média %.2f, desvio padrão %.2f",
+      app->histogram.mean, app->histogram.stddev);
   }
-
-  Uint8 mapping[HISTOGRAM_LEVELS] = { 0 };
-
-  if (!Histogram_equalization_mapping(&base, mapping))
+  else
   {
-    LOG_DEBUG("<<< equalize_image()");
-    return;
+    // O mapeamento é sempre calculado a partir do histograma da imagem em
+    // escala de cinza, e não do que está exibido no momento.
+    Histogram base = { .counts = { 0 }, .max_count = 0, .total_pixels = 0, .mean = 0.0f, .stddev = 0.0f };
+
+    if (!Histogram_compute(&base, app->image.surface))
+    {
+      LOG_DEBUG("<<< toggle_equalization()");
+      return;
+    }
+
+    Uint8 mapping[HISTOGRAM_LEVELS] = { 0 };
+
+    if (!Histogram_equalization_mapping(&base, mapping))
+    {
+      LOG_DEBUG("<<< toggle_equalization()");
+      return;
+    }
+
+    if (!MyImage_apply_mapping(&app->image, app->main_window.renderer, mapping))
+    {
+      LOG_DEBUG("<<< toggle_equalization()");
+      return;
+    }
+
+    // O enunciado exige que o histograma exibido acompanhe a imagem exibida.
+    if (!Histogram_compute(&app->histogram, app->image.processed))
+    {
+      LOG_DEBUG("<<< toggle_equalization()");
+      return;
+    }
+
+    app->equalized = true;
+    Button_set_label(&app->equalize_button, EQUALIZE_LABEL_REVERT);
+
+    LOG_INFO("Histograma equalizado: média %.2f -> %.2f, desvio padrão %.2f -> %.2f",
+      base.mean, app->histogram.mean, base.stddev, app->histogram.stddev);
   }
-
-  if (!MyImage_apply_mapping(&app->image, app->main_window.renderer, mapping))
-  {
-    LOG_DEBUG("<<< equalize_image()");
-    return;
-  }
-
-  // O enunciado exige que o histograma exibido acompanhe a imagem exibida,
-  // então ele é recalculado sobre o resultado da equalização.
-  Histogram_compute(&app->histogram, app->image.processed);
-
-  LOG_INFO("Histograma equalizado: média %.2f -> %.2f, desvio padrão %.2f -> %.2f",
-    base.mean, app->histogram.mean, base.stddev, app->histogram.stddev);
 
   render(app);
 
-  LOG_DEBUG("<<< equalize_image()");
+  LOG_DEBUG("<<< toggle_equalization()");
 }
 
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
-void reset_image(App *app)
-{
-  LOG_DEBUG(">>> reset_image()");
-
-  MyImage_restore_texture(&app->image, app->main_window.renderer);
-  render(app);
-
-  LOG_DEBUG("<<< reset_image()");
-}
 
 //------------------------------------------------------------------------------
 //
@@ -458,7 +483,6 @@ void loop(App *app)
           render_secondary(app);
         break;
 
-
       // Os botões vivem na janela secundária, então só os eventos de mouse
       // vindos dela interessam. As coordenadas já chegam relativas à janela.
       case SDL_EVENT_MOUSE_MOTION:
@@ -493,7 +517,7 @@ void loop(App *app)
           const bool b = Button_handle_mouse_up(&app->resolution_button, event.button.x, event.button.y, &resolution_activated);
 
           if (equalize_activated)
-            equalize_image(app);
+            toggle_equalization(app);
 
           if (resolution_activated)
             LOG_DEBUG("Botão de resolução acionado.");
@@ -515,16 +539,6 @@ void loop(App *app)
         }
         break;
 
-      case SDL_EVENT_KEY_DOWN:
-        if (!event.key.repeat)
-        {
-          switch (event.key.key)
-          {
-            case SDLK_R: // fallthrough.
-            case SDLK_0: reset_image(app); break;
-          }
-        }
-        break;
       }
     }
 
@@ -606,6 +620,7 @@ int main(int argc, char *argv[])
     .histogram = { .counts = { 0 }, .max_count = 0, .total_pixels = 0 },
     .equalize_button   = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
     .resolution_button = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
+    .equalized = false,
     .image = {
       .surface = NULL,
       .texture = NULL,

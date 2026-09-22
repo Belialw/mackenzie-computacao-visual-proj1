@@ -824,3 +824,48 @@ mesmo nível de saída e alguns níveis de saída ficam vazios.
 janela não chega ao programa: o Windows o consome para dar foco à janela. Foi
 preciso um clique de ativação antes do clique de teste. Não é comportamento do
 programa, e sim do sistema — vale lembrar ao testar interface por automação.
+
+---
+
+## 2026-09-22 — Item 5 (parte 2): alternância entre equalizada e original
+
+O botão de equalização virou uma alternância, e com isso o item 5 se completa.
+
+**Reverter sem reler o disco.** Este é um critério de nota separado, e sai de
+graça pela decisão tomada no commit anterior: a imagem equalizada vive em
+`image->processed` e a imagem em escala de cinza nunca saiu de
+`image->surface`. Voltar a exibi-la é só `MyImage_restore_texture()`, que
+reconstrói a textura a partir da surface que já está em memória. Nenhum acesso
+ao arquivo original.
+
+**O rótulo descreve a próxima ação, não o estado atual.** Com a imagem
+original na tela o botão diz "Equalizar histograma"; com a equalizada, "Ver
+original". É a convenção que o enunciado sugere no exemplo, e a que evita a
+ambiguidade de um rótulo que poderia ser lido como "estou nesse estado" ou
+"clique para ir a esse estado".
+
+O histograma e as estatísticas são recalculados nos dois sentidos, sobre a
+imagem que passou a ser exibida.
+
+**Remoção das teclas `R` e `0`.** Elas vinham do exemplo da disciplina e
+restauravam a imagem original. Agora que o botão faz isso mantendo o estado da
+interface em dia, manter as teclas criaria um segundo caminho para o mesmo
+estado, capaz de deixar a imagem revertida enquanto o rótulo do botão ainda
+dissesse "Ver original". Dois caminhos para o mesmo estado é exatamente onde
+esse tipo de inconsistência aparece, então as teclas saíram junto com a função
+`reset_image()`.
+
+### Verificação
+
+Dois cliques seguidos, com os valores conferidos no terminal:
+
+| Momento | Média | Desvio padrão | Rótulo do botão | Classificação |
+| --- | --- | --- | --- | --- |
+| inicial | 109,71 | 47,45 | Equalizar histograma | contraste médio |
+| após o primeiro clique | 128,19 | 73,52 | Ver original | contraste alto |
+| após o segundo clique | 109,71 | 47,45 | Equalizar histograma | contraste médio |
+
+A terceira linha repete a primeira **exatamente**, o que confirma que a imagem
+em escala de cinza foi recuperada da memória sem perda: se houvesse
+recarregamento ou reconversão, qualquer diferença de arredondamento apareceria
+nos valores. O gráfico volta à forma original, e não a uma aproximação dela.
