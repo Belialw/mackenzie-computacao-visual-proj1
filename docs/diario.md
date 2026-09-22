@@ -982,3 +982,71 @@ chega ao programa: foi preciso informar o scan code real da tecla (0x1F para
 `S`). Somado ao clique de ativação que o Windows consome, são dois detalhes do
 sistema que atrapalham o teste de interface por automação, e nenhum deles é
 comportamento do programa.
+
+---
+
+## 2026-09-22 — Robustez: casos-limite e dependência opcional da SDL_ttf
+
+Duas frentes, ambas voltadas ao mesmo risco: os únicos critérios que zeram a
+atividade são o projeto não compilar e o projeto travar.
+
+### Casos-limite
+
+Foram geradas imagens que exercitam situações que nenhuma foto comum produz:
+
+| Imagem | Resultado |
+| --- | --- |
+| 1x1 pixel | roda normalmente |
+| 1x4000 (uma coluna) | roda normalmente |
+| 4000x1 (uma linha) | roda normalmente |
+| 300x200 com canal alpha variável | roda normalmente |
+| 257x101, dimensões ímpares, já em cinza | roda normalmente |
+| PNG truncado no meio | erro tratado, saída 1 |
+| arquivo de texto renomeado para .png | erro tratado, saída 1 |
+
+Nenhum travamento. As dimensões ímpares e de uma linha ou coluna importam
+porque são exatamente onde um cálculo de endereço por `largura * 4`, em vez do
+`pitch`, produziria leitura fora da linha.
+
+### Auditoria de memória
+
+Conferência dos pares de alocação e liberação: janela e renderizador, surface
+carregada, surface convertida, surface de processamento, textura da imagem,
+textura de cada texto desenhado, fonte, e a inicialização e o encerramento da
+SDL e da SDL_ttf. Todos pareados. A surface temporária devolvida pelo
+`IMG_Load()` é liberada logo após a conversão para RGBA32, e a textura anterior
+é destruída antes de cada substituição.
+
+Não foi possível rodar um detector dinâmico: o `valgrind` precisaria da SDL3
+instalada no WSL, e o `-fsanitize=address` tem suporte limitado no MinGW. A
+verificação é estática, somada ao fato de que nenhuma das execuções acima
+apresentou falha.
+
+### SDL_ttf como dependência opcional
+
+O enunciado exige SDL3 e SDL_image e apenas **sugere** a SDL_ttf. Uma busca no
+repositório da disciplina não encontra nenhuma menção a ttf ou fonte: não há
+exemplo nem instruções de instalação. Existe, portanto, a possibilidade real de
+que a máquina que for compilar o projeto não tenha a biblioteca — e "não
+compila" zera a atividade.
+
+A proteção tem duas camadas, ambas baratas:
+
+**Em tempo de compilação.** `mingw32-make USE_SDL_TTF=0` remove a dependência:
+o cabeçalho não inclui a SDL_ttf, as funções de texto viram implementações
+vazias e o Makefile não passa `-lSDL3_ttf` nem copia a DLL correspondente.
+
+**Em tempo de execução.** Falhar ao carregar a fonte deixou de ser erro fatal.
+Antes, um arquivo de fonte ausente encerrava o programa; agora ele registra o
+aviso e segue. Tratar um recurso ausente como erro fatal é desproporcional, e
+deixaria o programa inutilizável por uma pasta que não foi copiada.
+
+Isso só é possível porque todas as funções de desenho de texto já devolviam
+falha em vez de assumir sucesso, e quem as chama já tratava esse retorno. A
+robustez não custou nada além de trocar o `return` por um aviso.
+
+Verificado nos três cenários: compilado sem a SDL_ttf, compilado normalmente
+mas com a pasta `assets/` ausente, e compilado normalmente com tudo no lugar.
+Nos dois primeiros o programa roda com a interface sem textos — histograma,
+botões e processamento continuam funcionando —, e as duas builds compilam sem
+nenhum aviso.

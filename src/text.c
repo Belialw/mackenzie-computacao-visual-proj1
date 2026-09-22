@@ -9,6 +9,8 @@
 #include "text.h"
 #include "log.h"
 
+#if USE_SDL_TTF
+
 // Caminho da fonte relativo ao diretório do executável. O Makefile copia a
 // pasta assets/ para junto do binário justamente para que este caminho valha.
 static const char *FONT_RELATIVE_PATH = "assets/fonts/DejaVuSans.ttf";
@@ -155,3 +157,55 @@ bool Text_measure(const TextRenderer *text, const char *string, int *width, int 
   // O comprimento zero indica à SDL_ttf que a string termina em nulo.
   return TTF_GetStringSize(text->font, string, 0, width, height);
 }
+
+#else // USE_SDL_TTF
+
+//------------------------------------------------------------------------------
+// Implementação vazia, usada quando o projeto é compilado sem a SDL_ttf. O
+// programa funciona normalmente, apenas sem desenhar textos: as funções de
+// desenho falham, e quem as chama já trata esse retorno sem interromper nada.
+//------------------------------------------------------------------------------
+
+bool Text_initialize(TextRenderer *text, float size)
+{
+  (void)size;
+
+  if (text)
+    text->initialized = false;
+
+  LOG_INFO("Compilado sem a SDL_ttf: a interface será exibida sem textos.");
+  return false;
+}
+
+void Text_shutdown(TextRenderer *text)
+{
+  (void)text;
+}
+
+bool Text_draw(const TextRenderer *text, SDL_Renderer *renderer, float x, float y, SDL_Color color, const char *string)
+{
+  (void)text;
+  (void)renderer;
+  (void)x;
+  (void)y;
+  (void)color;
+  (void)string;
+
+  return false;
+}
+
+bool Text_measure(const TextRenderer *text, const char *string, int *width, int *height)
+{
+  (void)text;
+  (void)string;
+
+  if (width)
+    *width = 0;
+
+  if (height)
+    *height = 0;
+
+  return false;
+}
+
+#endif // USE_SDL_TTF

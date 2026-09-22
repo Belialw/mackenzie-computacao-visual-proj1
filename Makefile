@@ -83,6 +83,30 @@ else
 endif
 
 # ------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------
+# SDL_ttf opcional
+#
+# O enunciado exige SDL3 e SDL_image e apenas sugere a SDL_ttf. Compilar com
+# USE_SDL_TTF=0 remove a dependencia: o programa continua funcionando, apenas
+# sem os textos da interface. Existe para que a ausencia da biblioteca na
+# maquina de quem compila nao impeca o projeto de ser construido.
+#
+#   mingw32-make USE_SDL_TTF=0
+# ------------------------------------------------------------------------------
+USE_SDL_TTF ?= 1
+CFLAGS += -DUSE_SDL_TTF=$(USE_SDL_TTF)
+
+ifeq ($(USE_SDL_TTF),1)
+  TTF_LIB := -lSDL3_ttf
+  TTF_PKG := sdl3-ttf
+else
+  TTF_LIB :=
+  TTF_PKG :=
+endif
+
+# ------------------------------------------------------------------------------
 # Localizacao das bibliotecas SDL3, por plataforma
 # ------------------------------------------------------------------------------
 ifeq ($(OS),Windows_NT)
@@ -90,7 +114,7 @@ ifeq ($(OS),Windows_NT)
 
   CFLAGS  += -I"$(SDL_DIR)/include"
   LDFLAGS += -L"$(SDL_DIR)/lib"
-  LDLIBS  += -lSDL3 -lSDL3_image -lSDL3_ttf
+  LDLIBS  += -lSDL3 -lSDL3_image $(TTF_LIB)
   EXE     := .exe
 
   # Versoes dos caminhos com barra invertida, para os comandos do cmd.exe.
@@ -100,7 +124,7 @@ ifeq ($(OS),Windows_NT)
   MKDIR_BUILD := if not exist "$(BUILD_DIR_WIN)" mkdir "$(BUILD_DIR_WIN)"
   RM_BUILD    := if exist "$(BUILD_DIR_WIN)" rmdir /s /q "$(BUILD_DIR_WIN)"
 else
-  SDL_PKGS := sdl3 sdl3-image sdl3-ttf
+  SDL_PKGS := sdl3 sdl3-image $(TTF_PKG)
 
   CFLAGS += $(shell pkg-config --cflags $(SDL_PKGS))
   LDLIBS += $(shell pkg-config --libs $(SDL_PKGS)) -lm
@@ -154,7 +178,9 @@ dlls: | $(BUILD_DIR)
 ifeq ($(OS),Windows_NT)
 	@copy /y "$(SDL_DIR_WIN)\bin\SDL3.dll" "$(BUILD_DIR_WIN)\SDL3.dll" >nul
 	@copy /y "$(SDL_DIR_WIN)\bin\SDL3_image.dll" "$(BUILD_DIR_WIN)\SDL3_image.dll" >nul
+ifeq ($(USE_SDL_TTF),1)
 	@copy /y "$(SDL_DIR_WIN)\bin\SDL3_ttf.dll" "$(BUILD_DIR_WIN)\SDL3_ttf.dll" >nul
+endif
 endif
 
 

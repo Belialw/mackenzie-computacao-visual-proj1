@@ -406,12 +406,14 @@ SDL_AppResult initialize(App *app)
 
   // A fonte é carregada depois das janelas porque os textos só são desenhados
   // por meio de um renderizador.
+  //
+  // A ausência da fonte não impede o programa de funcionar: a interface fica
+  // sem textos, mas a imagem, o histograma, os botões e todo o processamento
+  // continuam. Tratar um recurso ausente como erro fatal seria desproporcional
+  // e deixaria o programa inutilizável por um arquivo que não foi copiado.
   LOG_DEBUG("\tCarregando a fonte dos textos...");
   if (!Text_initialize(&app->text, FONT_SIZE))
-  {
-    LOG_DEBUG("<<< initialize()");
-    return SDL_APP_FAILURE;
-  }
+    LOG_ERROR("A interface será exibida sem textos.");
 
   Button_initialize(&app->equalize_button, EQUALIZE_BUTTON_AREA, EQUALIZE_LABEL_APPLY);
   Button_initialize(&app->resolution_button, RESOLUTION_BUTTON_AREA, RESOLUTION_LABEL_ORIGINAL);
@@ -738,7 +740,7 @@ int main(int argc, char *argv[])
   App app = {
     .main_window      = { .window = NULL, .renderer = NULL },
     .secondary_window = { .window = NULL, .renderer = NULL },
-    .text = { .font = NULL, .initialized = false },
+    .text = { .initialized = false },
     .histogram = { .counts = { 0 }, .max_count = 0, .total_pixels = 0 },
     .equalize_button   = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
     .resolution_button = { .bounds = { 0.0f, 0.0f, 0.0f, 0.0f }, .label = NULL, .state = BUTTON_STATE_NEUTRAL },
