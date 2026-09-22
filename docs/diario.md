@@ -1050,3 +1050,29 @@ mas com a pasta `assets/` ausente, e compilado normalmente com tudo no lugar.
 Nos dois primeiros o programa roda com a interface sem textos — histograma,
 botões e processamento continuam funcionando —, e as duas builds compilam sem
 nenhum aviso.
+
+---
+
+## 2026-09-22 — README final
+
+O README é um item de nota próprio, e o critério pede "estruturado e com
+explicações detalhadas". Foi completado com o que faltava:
+
+- **Estrutura do repositório** descrita módulo a módulo, com a explicação de
+  que a divisão é por responsabilidade e de que os módulos não se conhecem
+  entre si, apenas o `main` inclui todos.
+- **Imagens de teste**, explicando para que serve cada uma. As duas geradas
+  existem para exercitar caminhos que a fotografia não alcança: a imagem já em
+  escala de cinza, de média e desvio previsíveis analiticamente, e a imagem
+  maior que a tela.
+- **Como usar**, com a tabela de botões e teclas e o que o terminal informa.
+- **SDL_ttf opcional**, documentando `USE_SDL_TTF=0` e a degradação em tempo de
+  execução quando a fonte não é encontrada.
+- **Contribuições**, com a tabela montada para ser preenchida pelo grupo.
+
+Somado ao que já estava escrito — versões de tudo, instalação passo a passo nos
+dois sistemas, os dois detalhes que o Makefile resolve sozinho, e a seção de
+decisões de implementação com os limiares de classificação, a fonte escolhida,
+a regra de exibição da imagem e o formato do arquivo salvo —, o README cobre os
+itens que o enunciado lista: o que é o projeto, como funciona, como compilar e
+executar, e sistema operacional, compilador e bibliotecas com suas versões.
