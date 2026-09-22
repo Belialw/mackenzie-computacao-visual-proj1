@@ -6,6 +6,7 @@
 // Integrantes: ver README.md
 //------------------------------------------------------------------------------
 
+#include "log.h"
 #include "window.h"
 
 //------------------------------------------------------------------------------
@@ -13,11 +14,11 @@
 //------------------------------------------------------------------------------
 bool MyWindow_initialize(MyWindow *window, const char *title, int width, int height, SDL_WindowFlags window_flags)
 {
-  SDL_Log("\tMyWindow_initialize(%s, %d, %d)", title, width, height);
+  LOG_DEBUG("\tMyWindow_initialize(%s, %d, %d)", title, width, height);
 
   if (!window)
   {
-    SDL_Log("\t\t*** Erro: Janela/renderizador inválidos (window == NULL).");
+    LOG_ERROR("Janela/renderizador inválidos (window == NULL).");
     return false;
   }
 
@@ -29,22 +30,22 @@ bool MyWindow_initialize(MyWindow *window, const char *title, int width, int hei
 //------------------------------------------------------------------------------
 void MyWindow_destroy(MyWindow *window)
 {
-  SDL_Log(">>> MyWindow_destroy()");
+  LOG_DEBUG(">>> MyWindow_destroy()");
 
   if (!window)
   {
-    SDL_Log("\t*** Erro: Janela/renderizador inválidos (window == NULL).");
-    SDL_Log("<<< MyWindow_destroy()");
+    LOG_ERROR("Janela/renderizador inválidos (window == NULL).");
+    LOG_DEBUG("<<< MyWindow_destroy()");
     return;
   }
 
-  SDL_Log("\tDestruindo MyWindow->renderer...");
+  LOG_DEBUG("\tDestruindo MyWindow->renderer...");
   SDL_DestroyRenderer(window->renderer);
   window->renderer = NULL;
 
-  SDL_Log("\tDestruindo MyWindow->window...");
+  LOG_DEBUG("\tDestruindo MyWindow->window...");
   SDL_DestroyWindow(window->window);
   window->window = NULL;
 
-  SDL_Log("<<< MyWindow_destroy()");
+  LOG_DEBUG("<<< MyWindow_destroy()");
 }

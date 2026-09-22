@@ -31,6 +31,7 @@
 #include <SDL3/SDL_main.h>
 
 #include "image.h"
+#include "log.h"
 #include "window.h"
 
 //------------------------------------------------------------------------------
@@ -85,12 +86,12 @@ static void loop(App *app);
 //------------------------------------------------------------------------------
 void reset_image(App *app)
 {
-  SDL_Log(">>> reset_image()");
+  LOG_DEBUG(">>> reset_image()");
 
   MyImage_restore_texture(&app->image, app->window.renderer);
   render(app);
 
-  SDL_Log("<<< reset_image()");
+  LOG_DEBUG("<<< reset_image()");
 }
 
 //------------------------------------------------------------------------------
@@ -98,25 +99,25 @@ void reset_image(App *app)
 //------------------------------------------------------------------------------
 SDL_AppResult initialize(App *app)
 {
-  SDL_Log(">>> initialize()");
+  LOG_DEBUG(">>> initialize()");
 
-  SDL_Log("\tIniciando SDL...");
+  LOG_DEBUG("\tIniciando SDL...");
   if (!SDL_Init(SDL_INIT_VIDEO))
   {
-    SDL_Log("\t*** Erro ao iniciar a SDL: %s", SDL_GetError());
-    SDL_Log("<<< initialize()");
+    LOG_ERROR("Falha ao iniciar a SDL: %s", SDL_GetError());
+    LOG_DEBUG("<<< initialize()");
     return SDL_APP_FAILURE;
   }
 
-  SDL_Log("\tCriando janela e renderizador...");
+  LOG_DEBUG("\tCriando janela e renderizador...");
   if (!MyWindow_initialize(&app->window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0))
   {
-    SDL_Log("\t*** Erro ao criar a janela e/ou renderizador: %s", SDL_GetError());
-    SDL_Log("<<< initialize()");
+    LOG_ERROR("Falha ao criar a janela e/ou renderizador: %s", SDL_GetError());
+    LOG_DEBUG("<<< initialize()");
     return SDL_APP_FAILURE;
   }
 
-  SDL_Log("<<< initialize()");
+  LOG_DEBUG("<<< initialize()");
   return SDL_APP_CONTINUE;
 }
 
@@ -125,15 +126,15 @@ SDL_AppResult initialize(App *app)
 //------------------------------------------------------------------------------
 void shutdown(App *app)
 {
-  SDL_Log(">>> shutdown()");
+  LOG_DEBUG(">>> shutdown()");
 
   MyImage_destroy(&app->image);
   MyWindow_destroy(&app->window);
 
-  SDL_Log("\tEncerrando SDL...");
+  LOG_DEBUG("\tEncerrando SDL...");
   SDL_Quit();
 
-  SDL_Log("<<< shutdown()");
+  LOG_DEBUG("<<< shutdown()");
 }
 
 //------------------------------------------------------------------------------
@@ -154,7 +155,7 @@ void render(const App *app)
 //------------------------------------------------------------------------------
 void loop(App *app)
 {
-  SDL_Log(">>> loop()");
+  LOG_DEBUG(">>> loop()");
 
   render(app);
 
@@ -187,7 +188,7 @@ void loop(App *app)
     SDL_Delay(50);
   }
   
-  SDL_Log("<<< loop()");
+  LOG_DEBUG("<<< loop()");
 }
 
 //------------------------------------------------------------------------------
@@ -195,8 +196,8 @@ void loop(App *app)
 //------------------------------------------------------------------------------
 void print_usage(const char *program_name)
 {
-  SDL_Log("Uso: %s caminho_da_imagem.ext", program_name);
-  SDL_Log("Exemplo: %s samples/kodim23.png", program_name);
+  LOG_INFO("Uso: %s caminho_da_imagem.ext", program_name);
+  LOG_INFO("Exemplo: %s samples/kodim23.png", program_name);
 }
 
 //------------------------------------------------------------------------------
@@ -208,19 +209,19 @@ bool check_image_path(const char *filename)
 
   if (!SDL_GetPathInfo(filename, &info) || info.type == SDL_PATHTYPE_NONE)
   {
-    SDL_Log("*** Erro: arquivo não encontrado: %s", filename);
+    LOG_ERROR("Arquivo não encontrado: %s", filename);
     return false;
   }
 
   if (info.type == SDL_PATHTYPE_DIRECTORY)
   {
-    SDL_Log("*** Erro: %s é um diretório, não um arquivo de imagem.", filename);
+    LOG_ERROR("%s é um diretório, não um arquivo de imagem.", filename);
     return false;
   }
 
   if (info.type != SDL_PATHTYPE_FILE)
   {
-    SDL_Log("*** Erro: %s não é um arquivo comum.", filename);
+    LOG_ERROR("%s não é um arquivo comum.", filename);
     return false;
   }
 
@@ -237,14 +238,14 @@ int main(int argc, char *argv[])
 {
   if (argc < 2)
   {
-    SDL_Log("*** Erro: caminho da imagem não informado.");
+    LOG_ERROR("Caminho da imagem não informado.");
     print_usage(argv[0]);
     return EXIT_FAILURE;
   }
 
   if (argc > 2)
   {
-    SDL_Log("*** Erro: o programa recebe apenas um argumento.");
+    LOG_ERROR("O programa recebe apenas um argumento.");
     print_usage(argv[0]);
     return EXIT_FAILURE;
   }
@@ -287,7 +288,7 @@ int main(int argc, char *argv[])
     int left = 0;
     SDL_GetWindowBordersSize(app.window.window, &top, &left, NULL, NULL);
 
-    SDL_Log("Redefinindo dimensões da janela, de (%d, %d) para (%d, %d), e alterando a posição para (%d, %d).",
+    LOG_DEBUG("Redefinindo dimensões da janela, de (%d, %d) para (%d, %d), e alterando a posição para (%d, %d).",
       DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, imageWidth, imageHeight, left, top);
 
     SDL_SetWindowSize(app.window.window, imageWidth, imageHeight);

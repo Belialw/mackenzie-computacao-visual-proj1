@@ -317,3 +317,54 @@ O código original devolvia `SDL_APP_FAILURE` — um valor de enum da SDL, pensa
 para o retorno das callbacks de `SDL_AppInit`/`SDL_AppIterate`, não para o
 código de saída de um processo. Agora todas as saídas usam `EXIT_SUCCESS` ou
 `EXIT_FAILURE`. Na prática, a saída por imagem inválida passou de 2 para 1.
+
+---
+
+## 2026-09-22 — Refatoração 3/4: redução dos logs
+
+Última das quatro refatorações listadas no cabeçalho do arquivo original, que
+pede a "redução de logs (ou melhor, seriam desativados na build release)".
+
+O ponto de partida eram 70 chamadas de `SDL_Log()` espalhadas pelos três
+arquivos, registrando a entrada e a saída de praticamente toda função. Apagar
+tudo seria perder uma ferramenta de depuração útil; manter tudo é ruído para
+quem usa o programa. Pior: o enunciado exige que mensagens específicas apareçam
+no terminal — se a imagem é colorida ou está em escala de cinza, e o resultado
+do salvamento — e elas se perderiam no meio do rastreamento.
+
+A solução foi separar os dois tipos de mensagem em `src/log.h`:
+
+| Macro | Build de debug | Build de release | Uso |
+| --- | --- | --- | --- |
+| `LOG_DEBUG` | aparece | não aparece | rastreamento interno |
+| `LOG_INFO` | aparece | aparece | informação ao usuário |
+| `LOG_ERROR` | aparece | aparece | erro ao usuário |
+
+Distribuição das 70 chamadas: 47 viraram `LOG_DEBUG`, 2 `LOG_INFO` (o modo de
+uso) e 21 `LOG_ERROR`.
+
+**Detalhe do `LOG_DEBUG` na build de release.** A definição não é um
+`((void)0)` puro, e sim `do { if (0) SDL_Log(__VA_ARGS__); } while (0)`. Assim
+o compilador continua analisando a chamada — verifica a string de formato
+contra os argumentos e continua considerando as variáveis como usadas — mas
+descarta o código na otimização. Com `((void)0)`, um erro de formato só
+apareceria em quem compilasse com `DEBUG=1`, e variáveis usadas apenas em log
+passariam a gerar aviso de não utilizadas.
+
+**Limpeza das mensagens de erro.** O `LOG_ERROR` usa `SDL_LogError()`, e a SDL
+já prefixa a linha com `ERROR:`. Como as mensagens do código-base começavam com
+`*** Erro:`, a saída ficava `ERROR: *** Erro: ...`. O prefixo redundante foi
+removido das 18 mensagens, junto com os `\t` de indentação que só faziam
+sentido no rastreamento hierárquico.
+
+Resultado, com a mesma imagem e o mesmo binário de origem:
+
+| Situação | Release | Debug |
+| --- | --- | --- |
+| imagem válida | nenhuma linha | 18 linhas de rastreamento |
+| arquivo inexistente | `ERROR: Arquivo não encontrado: nada.png` | idem + rastreamento |
+| formato inválido | `ERROR: Formato de imagem inválido ou não suportado em ...` | idem + rastreamento |
+
+Com isso a Fase 1 se encerra: as quatro refatorações que o autor do código-base
+listou como necessárias em um projeto real estão feitas, cada uma em seu
+próprio commit.
