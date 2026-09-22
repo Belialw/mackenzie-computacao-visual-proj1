@@ -283,3 +283,37 @@ Distribuição depois da separação: `main.c` caiu de 511 para 286 linhas, cont
 `$(wildcard $(SRC_DIR)/*.c)` já compila e linka os novos arquivos
 automaticamente, e o rastreio de dependências por `-MMD -MP` passou a
 recompilar os `.c` corretos quando um header muda.
+
+---
+
+## 2026-09-22 — Refatoração 2/4: remoção das variáveis globais
+
+Terceira das quatro refatorações listadas no cabeçalho do arquivo original, que
+marca as globais com o comentário `// Globals (argh!)`.
+
+As duas globais, `g_window` e `g_image`, foram substituídas por uma struct
+`App` que agrega as duas e é criada como variável local de `main()`. As funções
+`initialize()`, `shutdown()`, `render()`, `loop()` e `reset_image()` passaram a
+receber `App *` por parâmetro. A `render()` recebe `const App *`, já que só lê o
+estado — o que o compilador agora garante.
+
+**Ponto delicado: o `atexit()`.** O código original registrava
+`atexit(shutdown)`, e `atexit()` só aceita função sem parâmetros. Havia duas
+saídas: manter um ponteiro estático para o `App` só para o `shutdown()`
+enxergar, ou abandonar o `atexit()` e chamar a limpeza explicitamente. A
+primeira opção reintroduziria pela porta dos fundos exatamente o estado global
+que a refatoração queria eliminar, então foi adotada a segunda. Hoje o
+`shutdown(&app)` é chamado nos três pontos de saída depois da inicialização.
+
+Isso é seguro mesmo quando a inicialização falha no meio: o `App` é criado com
+todos os ponteiros nulos, e tanto `MyWindow_destroy()` quanto
+`MyImage_destroy()` tratam ponteiro nulo, assim como o `SDL_DestroyWindow()` e
+o `SDL_DestroySurface()` da própria SDL. Verificado com um arquivo inválido: a
+falha acontece depois do `SDL_Init()`, o `shutdown()` roda e encerra a SDL
+normalmente.
+
+Aproveitando a passagem, os códigos de retorno de `main()` foram uniformizados.
+O código original devolvia `SDL_APP_FAILURE` — um valor de enum da SDL, pensado
+para o retorno das callbacks de `SDL_AppInit`/`SDL_AppIterate`, não para o
+código de saída de um processo. Agora todas as saídas usam `EXIT_SUCCESS` ou
+`EXIT_FAILURE`. Na prática, a saída por imagem inválida passou de 2 para 1.

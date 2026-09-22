@@ -44,14 +44,16 @@ enum constants
   DEFAULT_WINDOW_HEIGHT = 480,
 };
 
-//------------------------------------------------------------------------------
-// Globals (argh!)
-//------------------------------------------------------------------------------
-static MyWindow g_window = { .window = NULL, .renderer = NULL };
-static MyImage g_image = {
-  .surface = NULL,
-  .texture = NULL,
-  .rect = { .x = 0.0f, .y = 0.0f, .w = 0.0f, .h = 0.0f }
+/**
+ * Estado da aplicação. Substitui as variáveis globais do código original: em
+ * vez de cada função acessar diretamente a janela e a imagem, ambas são
+ * passadas por parâmetro a partir de main().
+ */
+typedef struct App App;
+struct App
+{
+  MyWindow window;
+  MyImage image;
 };
 
 //------------------------------------------------------------------------------
@@ -71,22 +73,22 @@ static void print_usage(const char *program_name);
  */
 static bool check_image_path(const char *filename);
 
-static void reset_image(void);
+static void reset_image(App *app);
 
-static SDL_AppResult initialize(void);
-static void shutdown(void);
-static void render(void);
-static void loop(void);
+static SDL_AppResult initialize(App *app);
+static void shutdown(App *app);
+static void render(const App *app);
+static void loop(App *app);
 
 //------------------------------------------------------------------------------
 // 
 //------------------------------------------------------------------------------
-void reset_image(void)
+void reset_image(App *app)
 {
   SDL_Log(">>> reset_image()");
 
-  MyImage_restore_texture(&g_image, g_window.renderer);
-  render();
+  MyImage_restore_texture(&app->image, app->window.renderer);
+  render(app);
 
   SDL_Log("<<< reset_image()");
 }
@@ -94,7 +96,7 @@ void reset_image(void)
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
-SDL_AppResult initialize(void)
+SDL_AppResult initialize(App *app)
 {
   SDL_Log(">>> initialize()");
 
@@ -107,7 +109,7 @@ SDL_AppResult initialize(void)
   }
 
   SDL_Log("\tCriando janela e renderizador...");
-  if (!MyWindow_initialize(&g_window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0))
+  if (!MyWindow_initialize(&app->window, WINDOW_TITLE, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, 0))
   {
     SDL_Log("\t*** Erro ao criar a janela e/ou renderizador: %s", SDL_GetError());
     SDL_Log("<<< initialize()");
@@ -121,12 +123,12 @@ SDL_AppResult initialize(void)
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
-void shutdown(void)
+void shutdown(App *app)
 {
   SDL_Log(">>> shutdown()");
 
-  MyImage_destroy(&g_image);
-  MyWindow_destroy(&g_window);
+  MyImage_destroy(&app->image);
+  MyWindow_destroy(&app->window);
 
   SDL_Log("\tEncerrando SDL...");
   SDL_Quit();
@@ -137,24 +139,24 @@ void shutdown(void)
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
-void render(void)
+void render(const App *app)
 {
-  SDL_SetRenderDrawColor(g_window.renderer, 128, 128, 128, 255);
-  SDL_RenderClear(g_window.renderer);
+  SDL_SetRenderDrawColor(app->window.renderer, 128, 128, 128, 255);
+  SDL_RenderClear(app->window.renderer);
 
-  SDL_RenderTexture(g_window.renderer, g_image.texture, &g_image.rect, &g_image.rect);
+  SDL_RenderTexture(app->window.renderer, app->image.texture, &app->image.rect, &app->image.rect);
 
-  SDL_RenderPresent(g_window.renderer);
+  SDL_RenderPresent(app->window.renderer);
 }
 
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
-void loop(void)
+void loop(App *app)
 {
   SDL_Log(">>> loop()");
 
-  render();
+  render(app);
 
   SDL_Event event;
   bool isRunning = true;
@@ -174,7 +176,7 @@ void loop(void)
           switch (event.key.key)
           {
             case SDLK_R: // fallthrough.
-            case SDLK_0: reset_image(); break;
+            case SDLK_0: reset_image(app); break;
           }
         }
         break;
@@ -228,6 +230,9 @@ bool check_image_path(const char *filename)
 //------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
 int main(int argc, char *argv[])
 {
   if (argc < 2)
@@ -249,38 +254,50 @@ int main(int argc, char *argv[])
   if (!check_image_path(image_filename))
     return EXIT_FAILURE;
 
-  atexit(shutdown);
+  App app = {
+    .window = { .window = NULL, .renderer = NULL },
+    .image = {
+      .surface = NULL,
+      .texture = NULL,
+      .rect = { .x = 0.0f, .y = 0.0f, .w = 0.0f, .h = 0.0f }
+    }
+  };
 
-  if (initialize() == SDL_APP_FAILURE)
-    return SDL_APP_FAILURE;
+  if (initialize(&app) == SDL_APP_FAILURE)
+  {
+    shutdown(&app);
+    return EXIT_FAILURE;
+  }
 
-  if (!load_rgba32(image_filename, g_window.renderer, &g_image))
-    return SDL_APP_FAILURE;
+  if (!load_rgba32(image_filename, app.window.renderer, &app.image))
+  {
+    shutdown(&app);
+    return EXIT_FAILURE;
+  }
 
   // Altera tamanho da janela se a imagem for maior do que o tamanho padrão
   // e reposiciona no canto superior esquerdo da tela.
-  int imageWidth = (int)g_image.rect.w;
-  int imageHeight = (int)g_image.rect.h;
+  int imageWidth = (int)app.image.rect.w;
+  int imageHeight = (int)app.image.rect.h;
   if (imageWidth > DEFAULT_WINDOW_WIDTH || imageHeight > DEFAULT_WINDOW_HEIGHT)
   {
-    // Obtém o tamanho da borda da janela. Neste exemplo, só queremos saber
-    // o lado superior e o lado esquerdo, para posicionar a janela corretamente
-    // (posicionar a janela na coordenada (0, 0) faria com que a borda do
-    // programa ficasse fora da região da tela).
+    // Obtém o tamanho da borda da janela: posicionar a janela na coordenada
+    // (0, 0) faria com que a borda do programa ficasse fora da região da tela.
     int top = 0;
     int left = 0;
-    SDL_GetWindowBordersSize(g_window.window, &top, &left, NULL, NULL);
+    SDL_GetWindowBordersSize(app.window.window, &top, &left, NULL, NULL);
 
     SDL_Log("Redefinindo dimensões da janela, de (%d, %d) para (%d, %d), e alterando a posição para (%d, %d).",
       DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT, imageWidth, imageHeight, left, top);
 
-    SDL_SetWindowSize(g_window.window, imageWidth, imageHeight);
-    SDL_SetWindowPosition(g_window.window, left, top);
+    SDL_SetWindowSize(app.window.window, imageWidth, imageHeight);
+    SDL_SetWindowPosition(app.window.window, left, top);
 
-    SDL_SyncWindow(g_window.window);
+    SDL_SyncWindow(app.window.window);
   }
 
-  loop();
+  loop(&app);
 
-  return 0;
+  shutdown(&app);
+  return EXIT_SUCCESS;
 }
