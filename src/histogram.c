@@ -204,3 +204,69 @@ const char *Histogram_contrast_label(const Histogram *histogram)
 
   return "médio";
 }
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+bool Histogram_equalization_mapping(const Histogram *histogram, Uint8 *mapping)
+{
+  LOG_DEBUG(">>> Histogram_equalization_mapping()");
+
+  if (!histogram || !mapping)
+  {
+    LOG_ERROR("Histograma ou tabela de mapeamento inválidos.");
+    LOG_DEBUG("<<< Histogram_equalization_mapping()");
+    return false;
+  }
+
+  if (histogram->total_pixels <= 0)
+  {
+    LOG_ERROR("Histograma vazio: não há o que equalizar.");
+    LOG_DEBUG("<<< Histogram_equalization_mapping()");
+    return false;
+  }
+
+  // Soma acumulada das contagens e o primeiro valor acumulado não nulo, que
+  // corresponde ao nível mais escuro presente na imagem.
+  int cumulative[HISTOGRAM_LEVELS] = { 0 };
+  int running_total = 0;
+  int cdf_min = 0;
+
+  for (int level = 0; level < HISTOGRAM_LEVELS; ++level)
+  {
+    running_total += histogram->counts[level];
+    cumulative[level] = running_total;
+
+    if (cdf_min == 0 && running_total > 0)
+      cdf_min = running_total;
+  }
+
+  const int denominator = histogram->total_pixels - cdf_min;
+
+  // Todos os pixels no mesmo nível: não existe faixa a espalhar, e qualquer
+  // normalização dividiria por zero. A identidade mantém a imagem como está.
+  if (denominator <= 0)
+  {
+    LOG_DEBUG("\tImagem de intensidade única; mapeamento identidade.");
+
+    for (int level = 0; level < HISTOGRAM_LEVELS; ++level)
+      mapping[level] = (Uint8)level;
+
+    LOG_DEBUG("<<< Histogram_equalization_mapping()");
+    return true;
+  }
+
+  for (int level = 0; level < HISTOGRAM_LEVELS; ++level)
+  {
+    const double normalized = (double)(cumulative[level] - cdf_min) / (double)denominator;
+    const double scaled = normalized * (HISTOGRAM_LEVELS - 1);
+
+    mapping[level] = (Uint8)SDL_round(scaled < 0.0 ? 0.0 : scaled);
+  }
+
+  LOG_DEBUG("\tcdf_min = %d, denominador = %d, mapeamento: 0 -> %u, 128 -> %u, 255 -> %u",
+    cdf_min, denominator, mapping[0], mapping[128], mapping[HISTOGRAM_LEVELS - 1]);
+
+  LOG_DEBUG("<<< Histogram_equalization_mapping()");
+  return true;
+}

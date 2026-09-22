@@ -42,6 +42,13 @@ void MyImage_destroy(MyImage *image)
     image->texture = NULL;
   }
 
+  if (image->processed)
+  {
+    LOG_DEBUG("	Destruindo MyImage->processed...");
+    SDL_DestroySurface(image->processed);
+    image->processed = NULL;
+  }
+
   if (image->surface)
   {
     LOG_DEBUG("\tDestruindo MyImage->surface...");
@@ -279,5 +286,84 @@ bool MyImage_to_grayscale(MyImage *image, SDL_Renderer *renderer)
   }
 
   LOG_DEBUG("<<< MyImage_to_grayscale()");
+  return true;
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+bool MyImage_apply_mapping(MyImage *image, SDL_Renderer *renderer, const Uint8 *mapping)
+{
+  LOG_DEBUG(">>> MyImage_apply_mapping()");
+
+  if (!image || !image->surface)
+  {
+    LOG_ERROR("Imagem inválida (image == NULL ou image->surface == NULL).");
+    LOG_DEBUG("<<< MyImage_apply_mapping()");
+    return false;
+  }
+
+  if (!renderer || !mapping)
+  {
+    LOG_ERROR("Renderer ou tabela de mapeamento inválidos.");
+    LOG_DEBUG("<<< MyImage_apply_mapping()");
+    return false;
+  }
+
+  SDL_Surface *source = image->surface;
+
+  // A surface de destino é criada uma única vez e reaproveitada nas aplicações
+  // seguintes, já que as dimensões e o formato não mudam.
+  if (!image->processed)
+  {
+    LOG_DEBUG("\tCriando a superfície de processamento...");
+    image->processed = SDL_CreateSurface(source->w, source->h, source->format);
+
+    if (!image->processed)
+    {
+      LOG_ERROR("Falha ao criar a superfície de processamento: %s", SDL_GetError());
+      LOG_DEBUG("<<< MyImage_apply_mapping()");
+      return false;
+    }
+  }
+
+  SDL_Surface *destination = image->processed;
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(source->format);
+
+  SDL_LockSurface(source);
+  SDL_LockSurface(destination);
+
+  for (int row = 0; row < source->h; ++row)
+  {
+    const Uint32 *source_pixels = (const Uint32 *)((const Uint8 *)source->pixels + (size_t)row * source->pitch);
+    Uint32 *destination_pixels = (Uint32 *)((Uint8 *)destination->pixels + (size_t)row * destination->pitch);
+
+    for (int col = 0; col < source->w; ++col)
+    {
+      Uint8 r = 0;
+      Uint8 g = 0;
+      Uint8 b = 0;
+      Uint8 a = 0;
+      SDL_GetRGBA(source_pixels[col], format, NULL, &r, &g, &b, &a);
+
+      // A imagem de origem está em escala de cinza, então basta mapear um dos
+      // canais e replicar o resultado nos três.
+      const Uint8 level = mapping[r];
+
+      destination_pixels[col] = SDL_MapRGBA(format, NULL, level, level, level, a);
+    }
+  }
+
+  SDL_UnlockSurface(destination);
+  SDL_UnlockSurface(source);
+
+  if (!MyImage_update_texture_with_surface(image, renderer, destination))
+  {
+    LOG_ERROR("Falha ao exibir a imagem processada.");
+    LOG_DEBUG("<<< MyImage_apply_mapping()");
+    return false;
+  }
+
+  LOG_DEBUG("<<< MyImage_apply_mapping()");
   return true;
 }

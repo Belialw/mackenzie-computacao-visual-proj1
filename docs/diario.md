@@ -753,3 +753,74 @@ tela em cada situação:
 As ações ainda não estão ligadas: por ora o clique apenas registra no log de
 depuração. A equalização, a alternância e a troca de resolução entram nos
 próximos três commits.
+
+---
+
+## 2026-09-22 — Item 5 (parte 1): equalização do histograma
+
+Maior pedaço isolado de nota que restava. A transformação é a função de
+distribuição acumulada normalizada:
+
+```
+mapping[i] = round( (cdf[i] - cdf_min) / (total - cdf_min) * 255 )
+```
+
+Subtrair `cdf_min`, o primeiro acumulado não nulo, faz o nível mais escuro
+presente na imagem ser mapeado para 0, de modo que o resultado use toda a faixa
+disponível.
+
+**Separação entre calcular e aplicar.** O módulo `histogram` devolve a tabela de
+mapeamento e o módulo `image` a aplica aos pixels. Assim `histogram` continua
+sem saber o que é uma imagem e `image` continua sem saber o que é um
+histograma, e cada parte pôde ser testada isoladamente.
+
+**Uma segunda surface, e não conversão no lugar.** O resultado vai para
+`image->processed`, criada sob demanda e reaproveitada nas aplicações
+seguintes. A imagem em escala de cinza em `image->surface` permanece intacta —
+é o que vai permitir reverter a equalização sem reler o arquivo do disco, que é
+um item de nota separado.
+
+**Equalizar duas vezes dá o mesmo resultado.** O mapeamento é sempre calculado
+a partir do histograma da imagem em escala de cinza, nunca do que está exibido.
+Sem esse cuidado, o segundo clique equalizaria o que já havia sido equalizado,
+e o resultado seria diferente do primeiro.
+
+**Caso degenerado.** Quando a imagem inteira tem uma única intensidade,
+`total - cdf_min` é zero. Em vez de dividir por zero, a tabela devolvida é a
+identidade e a imagem fica intacta, que é o comportamento sensato: não existe
+faixa a espalhar.
+
+Depois de equalizar, o histograma é recalculado sobre a imagem processada, já
+que o enunciado exige que o gráfico da janela secundária acompanhe a imagem
+exibida.
+
+### Verificação
+
+Cinco propriedades com resultado previsível analiticamente:
+
+| Caso | Esperado | Obtido |
+| --- | --- | --- |
+| histograma uniforme (já equalizado) | identidade nos 256 níveis | exato, nenhum desvio |
+| intensidade única (nível 90) | identidade, sem divisão por zero | `map[90] = 90` |
+| imagem escura concentrada em 0–63 | expande para 0–255 | `map[0] = 0`, `map[63] = 255` |
+| dois níveis isolados (10 e 200) | vão para os extremos | `map[10] = 0`, `map[200] = 255` |
+| histograma irregular | tabela nunca decresce | nenhuma queda, `map[255] = 255` |
+
+Na execução real, com `kodim23.png`:
+
+```
+mapeamento: 0 -> 0, 128 -> 186, 255 -> 255
+média 109.71 -> 128.19, desvio padrão 47.45 -> 73.52
+```
+
+A média foi para perto do centro da faixa e o desvio subiu para 73,52, quase
+exatamente o 73,90 de uma distribuição uniforme sobre 0–255 — que é justamente
+o alvo da equalização. A classificação exibida acompanhou, passando de
+"contraste médio" para "contraste alto". O gráfico mostra o padrão de pente
+característico da equalização discreta, em que vários níveis de entrada caem no
+mesmo nível de saída e alguns níveis de saída ficam vazios.
+
+**Nota sobre o teste automatizado.** O primeiro clique sintético enviado à
+janela não chega ao programa: o Windows o consome para dar foco à janela. Foi
+preciso um clique de ativação antes do clique de teste. Não é comportamento do
+programa, e sim do sistema — vale lembrar ao testar interface por automação.

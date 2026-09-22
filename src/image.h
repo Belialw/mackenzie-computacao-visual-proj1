@@ -23,6 +23,11 @@ typedef struct MyImage MyImage;
 struct MyImage
 {
   SDL_Surface *surface;
+
+  // Resultado do processamento atual, como a equalização. Fica separado de
+  // `surface` para que a imagem em escala de cinza continue intacta em
+  // memória: é ela que MyImage_restore_texture() devolve, sem reler o arquivo.
+  SDL_Surface *processed;
   SDL_Texture *texture;
   SDL_FRect rect;
 };
@@ -69,5 +74,18 @@ bool MyImage_is_grayscale(const MyImage *image);
  * MyImage_restore_texture() devolve a exibição.
  */
 bool MyImage_to_grayscale(MyImage *image, SDL_Renderer *renderer);
+
+
+/**
+ * Aplica a tabela de mapeamento de intensidades sobre a imagem em escala de
+ * cinza, guardando o resultado em `image->processed` e exibindo-o.
+ *
+ * A imagem original em escala de cinza (`image->surface`) não é alterada, de
+ * modo que MyImage_restore_texture() volte a exibi-la sem recarregar o arquivo
+ * do disco.
+ *
+ * O canal alpha de cada pixel é preservado.
+ */
+bool MyImage_apply_mapping(MyImage *image, SDL_Renderer *renderer, const Uint8 *mapping);
 
 #endif // IMAGE_H

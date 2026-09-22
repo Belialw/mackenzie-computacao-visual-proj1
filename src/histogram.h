@@ -78,4 +78,26 @@ const char *Histogram_brightness_label(const Histogram *histogram);
  */
 const char *Histogram_contrast_label(const Histogram *histogram);
 
+
+/**
+ * Calcula a tabela de mapeamento de intensidades da equalização de histograma:
+ * `mapping[i]` é a nova intensidade dos pixels que hoje têm intensidade `i`.
+ *
+ * A transformação é a função de distribuição acumulada normalizada:
+ *
+ *   mapping[i] = round( (cdf[i] - cdf_min) / (total - cdf_min) * 255 )
+ *
+ * em que `cdf[i]` é a soma das contagens até o nível `i` e `cdf_min` é o
+ * primeiro valor acumulado diferente de zero. Subtrair `cdf_min` faz o nível
+ * mais escuro presente na imagem ser mapeado para 0, usando toda a faixa
+ * disponível.
+ *
+ * Quando a imagem inteira tem uma só intensidade, não há faixa para espalhar e
+ * a tabela devolvida é a identidade, o que deixa a imagem intacta.
+ *
+ * O cálculo é separado da aplicação de propósito: esta função lida apenas com
+ * o histograma, e quem percorre os pixels é o módulo de imagem.
+ */
+bool Histogram_equalization_mapping(const Histogram *histogram, Uint8 *mapping);
+
 #endif // HISTOGRAM_H
