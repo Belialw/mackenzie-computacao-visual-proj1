@@ -368,3 +368,61 @@ Resultado, com a mesma imagem e o mesmo binário de origem:
 Com isso a Fase 1 se encerra: as quatro refatorações que o autor do código-base
 listou como necessárias em um projeto real estão feitas, cada uma em seu
 próprio commit.
+
+---
+
+## 2026-09-22 — Item 2: detecção e conversão para escala de cinza
+
+Primeira funcionalidade nova do projeto, e o primeiro item do escopo que não
+vinha de graça com o código-base. Duas funções novas no módulo `image`:
+
+`MyImage_is_grayscale()` percorre os pixels e devolve falso no primeiro em que
+R, G e B não sejam iguais. O canal alpha não entra na comparação: uma imagem
+cinza com transparência continua sendo cinza.
+
+`MyImage_to_grayscale()` aplica `Y = 0.2125*R + 0.7154*G + 0.0721*B` — a
+fórmula exata do enunciado, e não a 0.299/0.587/0.114 que aparece na maioria
+dos materiais sobre o assunto. Os três pesos somam exatamente 1,0, então o
+resultado nunca passa de 255 e não precisa ser limitado. O arredondamento usa
+`SDL_roundf()`; truncar puxaria a imagem inteira meio nível para baixo.
+
+**Conversão no lugar, e não em uma segunda surface.** A conversão altera a
+própria `image->surface`. Assim a imagem em escala de cinza passa a ser a base
+de tudo que vem depois, como o enunciado pede, e `MyImage_restore_texture()`
+passa a devolver exatamente a imagem em escala de cinza — que é o
+comportamento exigido no item 5 para desfazer a equalização sem recarregar o
+arquivo do disco.
+
+**Varredura por pitch.** O código-base calcula o índice do pixel como
+`row * surface->w + col`, o que só vale se cada linha ocupar exatamente
+`w * 4` bytes. A SDL pode alinhar as linhas e inserir bytes de preenchimento no
+fim de cada uma, caso em que esse cálculo lê o pixel errado. As duas funções
+novas usam `surface->pitch`, que é a distância real em bytes entre linhas. Para
+o formato RGBA32 os dois cálculos coincidem na prática, mas o segundo não
+depende disso.
+
+**Alpha preservado.** A conversão usa `SDL_GetRGBA`/`SDL_MapRGBA` em vez de
+`SDL_GetRGB`/`SDL_MapRGB`, mantendo a transparência original de cada pixel.
+
+### Verificação numérica
+
+Foi escrito um teste que chama `MyImage_to_grayscale()` com cores conhecidas e
+compara com o valor esperado pela fórmula:
+
+| Entrada | Esperado | Obtido |
+| --- | --- | --- |
+| vermelho puro (255, 0, 0) | 54 | 54 |
+| verde puro (0, 255, 0) | 182 | 182 |
+| azul puro (0, 0, 255) | 18 | 18 |
+| branco (255, 255, 255) | 255 | 255 |
+| preto (0, 0, 0) | 0 | 0 |
+| cinza médio (128, 128, 128) | 128 | 128 |
+| (10, 20, 30) com alpha 128 | 19, alpha 128 | 19, alpha 128 |
+
+A detecção também foi verificada nos dois sentidos: a mesma imagem é reportada
+como colorida antes da conversão e como cinza depois.
+
+Para exercitar o caminho da imagem que já chega em escala de cinza, foi gerado
+`samples/gray_gradient.png`, um gradiente 256x128 com R = G = B em todos os
+pixels. Com ele o programa informa que a imagem já está em escala de cinza e
+não converte nada.

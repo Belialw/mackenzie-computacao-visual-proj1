@@ -276,6 +276,24 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
+  // O enunciado exige informar no terminal se a imagem de entrada é colorida
+  // ou já está em escala de cinza, e converter apenas no primeiro caso. A
+  // imagem em escala de cinza é a base de todas as operações seguintes.
+  if (MyImage_is_grayscale(&app.image))
+  {
+    LOG_INFO("A imagem de entrada já está em escala de cinza.");
+  }
+  else
+  {
+    LOG_INFO("A imagem de entrada é colorida. Convertendo para escala de cinza...");
+
+    if (!MyImage_to_grayscale(&app.image, app.window.renderer))
+    {
+      shutdown(&app);
+      return EXIT_FAILURE;
+    }
+  }
+
   // Altera tamanho da janela se a imagem for maior do que o tamanho padrão
   // e reposiciona no canto superior esquerdo da tela.
   int imageWidth = (int)app.image.rect.w;

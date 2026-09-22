@@ -52,4 +52,22 @@ bool MyImage_restore_texture(MyImage* image, SDL_Renderer *renderer);
  */
 bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_image);
 
+
+/**
+ * Indica se a imagem já está em escala de cinza, isto é, se R, G e B têm o
+ * mesmo valor em todos os pixels. O canal alpha não é considerado.
+ */
+bool MyImage_is_grayscale(const MyImage *image);
+
+/**
+ * Converte a surface da imagem para escala de cinza, no lugar, usando a
+ * fórmula definida no enunciado do projeto, e atualiza a textura exibida. O
+ * canal alpha de cada pixel é preservado.
+ *
+ * A conversão acontece sobre `image->surface`, de modo que é a imagem em escala
+ * de cinza que passa a ser a base das operações seguintes, e é para ela que
+ * MyImage_restore_texture() devolve a exibição.
+ */
+bool MyImage_to_grayscale(MyImage *image, SDL_Renderer *renderer);
+
 #endif // IMAGE_H

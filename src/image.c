@@ -12,6 +12,16 @@
 #include <SDL3_image/SDL_image.h>
 
 //------------------------------------------------------------------------------
+// Pesos da conversão para escala de cinza, conforme a fórmula definida no
+// enunciado do projeto: Y = 0.2125*R + 0.7154*G + 0.0721*B.
+// Os três somam exatamente 1.0, então o resultado nunca ultrapassa 255 e não
+// precisa ser limitado.
+//------------------------------------------------------------------------------
+static const float GRAYSCALE_WEIGHT_R = 0.2125f;
+static const float GRAYSCALE_WEIGHT_G = 0.7154f;
+static const float GRAYSCALE_WEIGHT_B = 0.0721f;
+
+//------------------------------------------------------------------------------
 //
 //------------------------------------------------------------------------------
 void MyImage_destroy(MyImage *image)
@@ -166,5 +176,108 @@ bool load_rgba32(const char *filename, SDL_Renderer *renderer, MyImage *output_i
   }
 
   LOG_DEBUG("<<< load_rgba32(\"%s\")", filename);
+  return true;
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+bool MyImage_is_grayscale(const MyImage *image)
+{
+  if (!image || !image->surface)
+  {
+    LOG_ERROR("Imagem inválida (image == NULL ou image->surface == NULL).");
+    return false;
+  }
+
+  SDL_Surface *surface = image->surface;
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
+  bool is_grayscale = true;
+
+  SDL_LockSurface(surface);
+
+  for (int row = 0; row < surface->h && is_grayscale; ++row)
+  {
+    // A varredura usa o pitch (distância em bytes entre linhas) em vez de
+    // supor que uma linha ocupe exatamente w * 4 bytes: a SDL pode alinhar as
+    // linhas e inserir bytes de preenchimento no fim de cada uma.
+    const Uint32 *pixels = (const Uint32 *)((const Uint8 *)surface->pixels + (size_t)row * surface->pitch);
+
+    for (int col = 0; col < surface->w; ++col)
+    {
+      Uint8 r = 0;
+      Uint8 g = 0;
+      Uint8 b = 0;
+      SDL_GetRGB(pixels[col], format, NULL, &r, &g, &b);
+
+      if (r != g || g != b)
+      {
+        is_grayscale = false;
+        break;
+      }
+    }
+  }
+
+  SDL_UnlockSurface(surface);
+
+  return is_grayscale;
+}
+
+//------------------------------------------------------------------------------
+//
+//------------------------------------------------------------------------------
+bool MyImage_to_grayscale(MyImage *image, SDL_Renderer *renderer)
+{
+  LOG_DEBUG(">>> MyImage_to_grayscale()");
+
+  if (!image || !image->surface)
+  {
+    LOG_ERROR("Imagem inválida (image == NULL ou image->surface == NULL).");
+    LOG_DEBUG("<<< MyImage_to_grayscale()");
+    return false;
+  }
+
+  if (!renderer)
+  {
+    LOG_ERROR("Renderer inválido (renderer == NULL).");
+    LOG_DEBUG("<<< MyImage_to_grayscale()");
+    return false;
+  }
+
+  SDL_Surface *surface = image->surface;
+  const SDL_PixelFormatDetails *format = SDL_GetPixelFormatDetails(surface->format);
+
+  SDL_LockSurface(surface);
+
+  for (int row = 0; row < surface->h; ++row)
+  {
+    Uint32 *pixels = (Uint32 *)((Uint8 *)surface->pixels + (size_t)row * surface->pitch);
+
+    for (int col = 0; col < surface->w; ++col)
+    {
+      Uint8 r = 0;
+      Uint8 g = 0;
+      Uint8 b = 0;
+      Uint8 a = 0;
+      SDL_GetRGBA(pixels[col], format, NULL, &r, &g, &b, &a);
+
+      const float luminance = GRAYSCALE_WEIGHT_R * r + GRAYSCALE_WEIGHT_G * g + GRAYSCALE_WEIGHT_B * b;
+      const Uint8 y = (Uint8)SDL_roundf(luminance);
+
+      pixels[col] = SDL_MapRGBA(format, NULL, y, y, y, a);
+    }
+  }
+
+  SDL_UnlockSurface(surface);
+
+  LOG_DEBUG("\tAtualizando a textura com a imagem em escala de cinza...");
+  if (!MyImage_update_texture_with_surface(image, renderer, surface))
+  {
+    LOG_ERROR("Falha ao atualizar a textura após a conversão para escala de cinza.");
+    LOG_DEBUG("<<< MyImage_to_grayscale()");
+    return false;
+  }
+
+  LOG_DEBUG("<<< MyImage_to_grayscale()");
   return true;
 }
